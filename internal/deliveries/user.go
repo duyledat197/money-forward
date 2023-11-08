@@ -1,6 +1,8 @@
 package deliveries
 
-import "context"
+import (
+	"context"
+)
 
 // using skeleton with cmd (d *userDelivery UserDelivery)
 type UserDelivery interface {
@@ -19,6 +21,7 @@ func (d *userDelivery) CreateUser(_ context.Context, _ *CreateUserRequest) (*Cre
 	return &CreateUserResponse{}, nil
 }
 
-func (d *userDelivery) GetUserByID(_ context.Context, _ *GetUserByIDRequest) (*GetUserByIDResponse, error) {
+func (d *userDelivery) GetUserByID(_ context.Context, req *GetUserByIDRequest) (*GetUserByIDResponse, error) {
+
 	return &GetUserByIDResponse{}, nil
 }

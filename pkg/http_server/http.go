@@ -9,11 +9,10 @@ import (
 	"maps"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"user-management/configs"
 	"user-management/pkg/reflect_utils"
-
-	"github.com/gorilla/mux"
 )
 
 var re = regexp.MustCompile(`\{(.*?)\}`)
@@ -40,8 +39,9 @@ func NewHttpServer(endpoint *configs.Endpoint, logger *slog.Logger) *HttpServer 
 func (s *HttpServer) Start(ctx context.Context) error {
 	s.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		for route, next := range s.handlerMap {
-			if isMatchPath(route, joinPath(r.Method, r.URL.Path)) {
-				next(w, r)
+			_, path, _ := strings.Cut(route, " ")
+			if isMatchPath(path, r.URL.Path) {
+				next(w, appendWildCardParams(path, r))
 				return
 			}
 		}
@@ -76,10 +76,13 @@ func handleWithoutBody[Request, Response any](handler handler[Request, Response]
 		ctx := r.Context()
 		params := make(map[string]any)
 
-		wildcardParams := mux.Vars(r)
-		for k, v := range wildcardParams {
-			params[k] = v
+		wildcardParams, ok := ctx.Value(&wildcardParamsKey{}).(map[string]any)
+		if !ok {
+			errorResponse(w, http.StatusInternalServerError, fmt.Errorf("unable to get wildcard params"))
+			return
 		}
+
+		maps.Copy(params, wildcardParams)
 
 		for k, v := range r.URL.Query() {
 			switch len(v) {
@@ -122,11 +125,6 @@ func handleWithBody[Request, Response any](handler handler[Request, Response]) h
 		}
 
 		params := make(map[string]any)
-
-		wildcardParams := mux.Vars(r)
-		for k, v := range wildcardParams {
-			params[k] = v
-		}
 
 		for k, v := range r.URL.Query() {
 			switch len(v) {
