@@ -5,6 +5,7 @@ import (
 	"net/http"
 )
 
+// response struct present response format to http client
 type response struct {
 	Code    int      `json:"code"`
 	Message string   `json:"message"`
@@ -12,6 +13,7 @@ type response struct {
 	Data    any      `json:"data"`
 }
 
+// errorResponse write error to http response with passing code and error
 func errorResponse(w http.ResponseWriter, code int, err error) {
 	resp := &response{
 		Code:    code,
@@ -26,6 +28,8 @@ func errorResponse(w http.ResponseWriter, code int, err error) {
 	w.Write(jData)
 }
 
+// dataResponse write response data to http response with passing data.
+// The response status code fixed to 200
 func dataResponse(w http.ResponseWriter, data any) {
 	resp := &response{
 		Data: data,

@@ -1,3 +1,5 @@
+// Package http_server provides an easy implementation handler
+// for http server with register handle by method, path, generic handler
 package http_server
 
 import (
@@ -26,17 +28,24 @@ type HttpServer struct {
 	logger     *slog.Logger
 	endpoint   *configs.Endpoint
 	handlerMap map[string]httpHandler
+	server     *http.Server
 }
 
 func NewHttpServer(endpoint *configs.Endpoint, logger *slog.Logger) *HttpServer {
+	mux := http.NewServeMux()
 	return &HttpServer{
-		http.NewServeMux(),
+		mux,
 		logger,
 		endpoint,
 		make(map[string]httpHandler),
+		&http.Server{
+			Handler: mux,
+			Addr:    endpoint.Address(),
+		},
 	}
 }
 
+// Start will start server and matching with processors pattern
 func (s *HttpServer) Start(ctx context.Context) error {
 	s.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		for route, next := range s.handlerMap {
@@ -51,17 +60,19 @@ func (s *HttpServer) Start(ctx context.Context) error {
 	})
 
 	s.logger.InfoContext(ctx, "server listening in", "address", s.endpoint.Address())
-	if err := http.ListenAndServe(s.endpoint.Address(), s.ServeMux); err != nil {
+	if err := s.server.ListenAndServe(); err != nil {
 		return err
 	}
 
 	return nil
 }
 
+// Stop will stop server with graceful shutdown and matching with processors pattern
 func (s *HttpServer) Stop(ctx context.Context) error {
-	return nil
+	return s.server.Shutdown(ctx)
 }
 
+// Register will register to http server by method, path and handler with generic handler
 func Register[Request, Response any](s *HttpServer, method, path string, handler handler[Request, Response]) {
 	switch method {
 	case http.MethodOptions:
@@ -72,6 +83,7 @@ func Register[Request, Response any](s *HttpServer, method, path string, handler
 	}
 }
 
+// retrieveRequest returns a handler with marshal all body, query, params from http request to request of generic handler
 func retrieveRequest[Request, Response any](handler handler[Request, Response]) httpHandler {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
