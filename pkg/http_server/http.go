@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"maps"
 	"net/http"
@@ -63,19 +64,34 @@ func (s *HttpServer) Stop(ctx context.Context) error {
 
 func Register[Request, Response any](s *HttpServer, method, path string, handler handler[Request, Response]) {
 	switch method {
-	case http.MethodGet, http.MethodDelete:
-		s.handlerMap[joinPath(method, path)] = handleWithoutBody(handler)
-	case http.MethodPost, http.MethodPut:
-		s.handlerMap[joinPath(method, path)] = handleWithBody(handler)
+	case http.MethodOptions:
+	case http.MethodGet, http.MethodDelete, http.MethodPost, http.MethodPut:
+		s.handlerMap[joinPath(method, path)] = retrieveRequest(handler)
+	default:
+		log.Fatalf("unsupported method %s for http server", method)
 	}
-
 }
 
-func handleWithoutBody[Request, Response any](handler handler[Request, Response]) httpHandler {
+func retrieveRequest[Request, Response any](handler handler[Request, Response]) httpHandler {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		params := make(map[string]any)
 
+		// retrieve data from request body with Post, Put methods
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			errorResponse(w, http.StatusBadRequest, err)
+			return
+		}
+
+		bodyMap := make(map[string]any)
+		if err := json.Unmarshal(body, &bodyMap); err != nil {
+			errorResponse(w, http.StatusBadRequest, err)
+			return
+		}
+		maps.Copy(params, bodyMap)
+
+		// retrieve data from params (ex: with "/users/{id}" we will got the value of id )
 		wildcardParams, ok := ctx.Value(&wildcardParamsKey{}).(map[string]any)
 		if !ok {
 			errorResponse(w, http.StatusInternalServerError, fmt.Errorf("unable to get wildcard params"))
@@ -84,6 +100,7 @@ func handleWithoutBody[Request, Response any](handler handler[Request, Response]
 
 		maps.Copy(params, wildcardParams)
 
+		// retrieve data from queries params (ex: with /users?name=dat we will got value of name)
 		for k, v := range r.URL.Query() {
 			switch len(v) {
 			case 0:
@@ -108,83 +125,4 @@ func handleWithoutBody[Request, Response any](handler handler[Request, Response]
 
 		dataResponse(w, resp)
 	}
-}
-
-func handleWithBody[Request, Response any](handler handler[Request, Response]) httpHandler {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		body, err := r.GetBody()
-		if err != nil {
-			errorResponse(w, http.StatusBadRequest, err)
-			return
-		}
-		readReqBody, err := io.ReadAll(body)
-		if err != nil {
-			errorResponse(w, http.StatusBadRequest, err)
-			return
-		}
-
-		params := make(map[string]any)
-
-		for k, v := range r.URL.Query() {
-			switch len(v) {
-			case 0:
-			case 1:
-				params[k] = v[0]
-			default:
-				params[k] = v
-			}
-		}
-		bodyMap := make(map[string]any)
-		if err := json.Unmarshal(readReqBody, &bodyMap); err != nil {
-			errorResponse(w, http.StatusBadRequest, err)
-			return
-		}
-		maps.Copy(params, bodyMap)
-		var req Request
-		if err := reflect_utils.ConvertMapToStruct(params, &req); err != nil {
-			errorResponse(w, http.StatusInternalServerError, err)
-			return
-		}
-		resp, err := handler(ctx, &req)
-		if err != nil {
-			errorResponse(w, http.StatusBadRequest, err)
-			return
-		}
-
-		dataResponse(w, resp)
-	}
-}
-
-type response struct {
-	Code    int      `json:"code"`
-	Message string   `json:"message"`
-	Details []string `json:"details"`
-	Data    any      `json:"data"`
-}
-
-func errorResponse(w http.ResponseWriter, code int, err error) {
-	resp := &response{
-		Code:    code,
-		Message: err.Error(),
-		Details: []string{},
-	}
-
-	jData, _ := json.Marshal(resp)
-
-	w.WriteHeader(code)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(jData)
-}
-
-func dataResponse(w http.ResponseWriter, data any) {
-	resp := &response{
-		Data: data,
-	}
-
-	jData, _ := json.Marshal(resp)
-
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(jData)
 }
