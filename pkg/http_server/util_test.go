@@ -26,7 +26,7 @@ func FuzzMatchPath(f *testing.F) {
 			want: false,
 		},
 		{
-			path: "/users/123/asdsa",
+			path: "/users/123/accounts",
 			want: false,
 		},
 	}

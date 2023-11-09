@@ -20,9 +20,13 @@ import (
 
 var re = regexp.MustCompile(`\{(.*?)\}`)
 
+// generic handler
 type handler[Request, Response any] func(context.Context, *Request) (*Response, error)
+
+// http handler
 type httpHandler func(http.ResponseWriter, *http.Request)
 
+// HttpServer represents a http server  include mux, logger
 type HttpServer struct {
 	*http.ServeMux
 	logger     *slog.Logger
@@ -103,7 +107,7 @@ func retrieveRequest[Request, Response any](handler handler[Request, Response]) 
 		}
 		maps.Copy(params, bodyMap)
 
-		// retrieve data from params (ex: with "/users/{id}" we will got the value of id )
+		// retrieve data from wildcard params (ex: with "/users/{id}" we will got the value of id )
 		wildcardParams, ok := ctx.Value(&wildcardParamsKey{}).(map[string]any)
 		if !ok {
 			errorResponse(w, http.StatusInternalServerError, fmt.Errorf("unable to get wildcard params"))
