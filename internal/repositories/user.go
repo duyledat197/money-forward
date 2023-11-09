@@ -15,6 +15,7 @@ func NewUserRepository() *UserRepository {
 	return &UserRepository{}
 }
 
+// Create is an implementation of inserting a user entity
 func (r *UserRepository) Create(ctx context.Context, db database.Executor, data *entities.User) error {
 	fieldNames, values := database.FieldMap(data)
 	placeHolder := database.GetPlaceholders(len(fieldNames))
