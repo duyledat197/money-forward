@@ -8,12 +8,14 @@ import (
 	"user-management/configs"
 	"user-management/internal/deliveries"
 	"user-management/pkg/http_server"
+	"user-management/pkg/postgres_client"
 	"user-management/pkg/processor"
 )
 
 var (
-	logger     *slog.Logger
-	httpServer *http_server.HttpServer
+	logger         *slog.Logger
+	httpServer     *http_server.HttpServer
+	postgresClient *postgres_client.PostgresClient
 
 	userDelivery deliveries.UserDelivery
 
@@ -30,7 +32,10 @@ func loadHttpServer() {
 		Port: "8080",
 	}, logger)
 
-	processors = append(processors, httpServer)
+}
+
+func loadPostgresClient() {
+	postgresClient = postgres_client.NewPostgresClient("")
 }
 
 func loadDeliveries() {
@@ -42,11 +47,22 @@ func registerHandlers() {
 	http_server.Register(httpServer, http.MethodGet, "/users/{id}", userDelivery.GetUserByID)
 }
 
+func registerFactories() {
+	factories = append(factories, postgresClient)
+}
+
+func registerProcessors() {
+	processors = append(processors, httpServer)
+}
+
 func loadDefault() {
 	loadLogger()
+	loadPostgresClient()
 	loadHttpServer()
 	loadDeliveries()
 	registerHandlers()
+	registerFactories()
+	registerProcessors()
 }
 
 func start(ctx context.Context, errChan chan error) {

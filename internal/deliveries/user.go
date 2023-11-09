@@ -5,6 +5,7 @@ import (
 )
 
 // using skeleton with cmd (d *userDelivery UserDelivery)
+
 type UserDelivery interface {
 	CreateUser(context.Context, *CreateUserRequest) (*CreateUserResponse, error)
 	GetUserByID(context.Context, *GetUserByIDRequest) (*GetUserByIDResponse, error)
