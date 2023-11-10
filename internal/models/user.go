@@ -1,16 +1,21 @@
-package deliveries
+package models
 
 type CreateUserRequest struct {
 	UserName string `json:"user_name"`
 	Password string `json:"password"`
+	Name     string `json:"name"`
+	Role     string `json:"role"`
 }
 type CreateUserResponse struct {
-	ID string `json:"id"`
+	ID int64 `json:"id"`
 }
 
 type GetUserByIDRequest struct {
-	ID   string `json:"id"`
+	ID   int64  `json:"id"`
 	Name string `json:"name"`
 }
 type GetUserByIDResponse struct {
+	ID         int64   `json:"id"`
+	Name       string  `json:"name"`
+	AccountIDs []int64 `json:"account_ids"`
 }

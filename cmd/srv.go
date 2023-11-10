@@ -3,11 +3,13 @@ package cmd
 import (
 	"context"
 	"log/slog"
-	"net/http"
+	"math/rand"
 	"os"
 	"user-management/configs"
-	"user-management/internal/deliveries"
+	deliveries "user-management/internal/deliveries/http"
+	"user-management/internal/services"
 	"user-management/pkg/http_server"
+	"user-management/pkg/id_utils"
 	"user-management/pkg/postgres_client"
 	"user-management/pkg/processor"
 )
@@ -17,7 +19,9 @@ var (
 	httpServer     *http_server.HttpServer
 	postgresClient *postgres_client.PostgresClient
 
-	userDelivery deliveries.UserDelivery
+	idGenerator id_utils.IDGenerator
+
+	userService services.UserService
 
 	processors []processor.Processor
 	factories  []processor.Factory
@@ -25,6 +29,10 @@ var (
 
 func loadLogger() {
 	logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+}
+
+func loadIDGenerator() {
+	idGenerator = id_utils.NewSnowFlake(rand.Int63n(10))
 }
 
 func loadHttpServer() {
@@ -38,13 +46,12 @@ func loadPostgresClient() {
 	postgresClient = postgres_client.NewPostgresClient("")
 }
 
-func loadDeliveries() {
-	userDelivery = deliveries.NewUserDelivery()
+func loadServices() {
+	userService = services.NewUserService(postgresClient, idGenerator)
 }
 
 func registerHandlers() {
-	http_server.Register(httpServer, http.MethodPost, "/users", userDelivery.CreateUser)
-	http_server.Register(httpServer, http.MethodGet, "/users/{id}", userDelivery.GetUserByID)
+	deliveries.RegisterUserDelivery(httpServer, userService)
 }
 
 func registerFactories() {
@@ -56,10 +63,14 @@ func registerProcessors() {
 }
 
 func loadDefault() {
+	// loader
 	loadLogger()
+	loadIDGenerator()
 	loadPostgresClient()
+	loadServices()
 	loadHttpServer()
-	loadDeliveries()
+
+	// register
 	registerHandlers()
 	registerFactories()
 	registerProcessors()

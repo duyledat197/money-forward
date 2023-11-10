@@ -20,7 +20,9 @@ import (
 
 var re = regexp.MustCompile(`\{(.*?)\}`)
 
-// generic handler
+// handler is a presentation for a implementation of a delivery API.
+// handler returns a response or error with passing context and request in parameters.
+// We defined handler as a common pattern for all deliveries.
 type handler[Request, Response any] func(context.Context, *Request) (*Response, error)
 
 // http handler
@@ -80,7 +82,11 @@ func (s *HttpServer) Stop(ctx context.Context) error {
 func Register[Request, Response any](s *HttpServer, method, path string, handler handler[Request, Response]) {
 	switch method {
 	case http.MethodOptions:
-	case http.MethodGet, http.MethodDelete, http.MethodPost, http.MethodPut:
+	case
+		http.MethodGet,
+		http.MethodDelete,
+		http.MethodPost,
+		http.MethodPut:
 		s.handlerMap[joinPath(method, path)] = retrieveRequest(handler)
 	default:
 		log.Fatalf("unsupported method %s for http server", method)
