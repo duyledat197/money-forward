@@ -97,48 +97,16 @@ func Register[Request, Response any](s *HttpServer, method, path string, handler
 func retrieveRequest[Request, Response any](handler handler[Request, Response]) httpHandler {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		params := make(map[string]any)
-
-		// retrieve data from request body with Post, Put methods
-		body, err := io.ReadAll(r.Body)
+		params, err := retrieveDataFromRequest(w, r)
 		if err != nil {
 			errorResponse(w, http.StatusBadRequest, err)
 			return
 		}
-
-		bodyMap := make(map[string]any)
-		if err := json.Unmarshal(body, &bodyMap); err != nil {
-			errorResponse(w, http.StatusBadRequest, err)
-			return
-		}
-		maps.Copy(params, bodyMap)
-
-		// retrieve data from wildcard params (ex: with "/users/{id}" we will got the value of id )
-		wildcardParams, ok := ctx.Value(&wildcardParamsKey{}).(map[string]any)
-		if !ok {
-			errorResponse(w, http.StatusInternalServerError, fmt.Errorf("unable to get wildcard params"))
-			return
-		}
-
-		maps.Copy(params, wildcardParams)
-
-		// retrieve data from queries params (ex: with /users?name=dat we will got value of name)
-		for k, v := range r.URL.Query() {
-			switch len(v) {
-			case 0:
-			case 1:
-				params[k] = v[0]
-			default:
-				params[k] = v
-			}
-		}
-
 		var req Request
 		if err := reflect_utils.ConvertMapToStruct(params, &req); err != nil {
 			errorResponse(w, http.StatusInternalServerError, err)
 			return
 		}
-
 		resp, err := handler(ctx, &req)
 		if err != nil {
 			errorResponse(w, http.StatusBadRequest, err)
@@ -147,4 +115,43 @@ func retrieveRequest[Request, Response any](handler handler[Request, Response]) 
 
 		dataResponse(w, resp)
 	}
+}
+
+func retrieveDataFromRequest(w http.ResponseWriter, r *http.Request) (map[string]any, error) {
+	ctx := r.Context()
+	params := make(map[string]any)
+
+	// retrieve data from request body with Post, Put methods
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+
+		return nil, err
+	}
+
+	bodyMap := make(map[string]any)
+	if err := json.Unmarshal(body, &bodyMap); err != nil {
+		return nil, err
+	}
+	maps.Copy(params, bodyMap)
+
+	// retrieve data from wildcard params (ex: with "/users/{id}" we will got the value of id )
+	wildcardParams, ok := ctx.Value(&wildcardParamsKey{}).(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unable to get wildcard params")
+	}
+
+	maps.Copy(params, wildcardParams)
+
+	// retrieve data from queries params (ex: with /users?name=dat we will got value of name)
+	for k, v := range r.URL.Query() {
+		switch len(v) {
+		case 0:
+		case 1:
+			params[k] = v[0]
+		default:
+			params[k] = v
+		}
+	}
+
+	return params, nil
 }
