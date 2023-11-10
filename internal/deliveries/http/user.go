@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+
 	"user-management/internal/entities"
 	"user-management/internal/models"
 	"user-management/internal/services"
@@ -62,7 +63,20 @@ func (d *userDelivery) CreateUser(ctx context.Context, req *models.CreateUserReq
 	}, nil
 }
 
-func (d *userDelivery) GetUserByID(_ context.Context, req *models.GetUserByIDRequest) (*models.GetUserByIDResponse, error) {
+func (d *userDelivery) GetUserByID(ctx context.Context, req *models.GetUserByIDRequest) (*models.GetUserByIDResponse, error) {
+	if req.ID == 0 {
+		return nil, fmt.Errorf("id must not be empty")
+	}
 
-	return &models.GetUserByIDResponse{}, nil
+	data, err := d.userService.GetUserByID(ctx, req.ID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to retrieve user by id: %w", err)
+	}
+
+	resp := &models.GetUserByIDResponse{
+		ID:   data.ID,
+		Name: data.Name.String,
+	}
+
+	return resp, nil
 }

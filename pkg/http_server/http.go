@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"maps"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -25,10 +26,10 @@ var re = regexp.MustCompile(`\{(.*?)\}`)
 // We defined handler as a common pattern for all deliveries.
 type handler[Request, Response any] func(context.Context, *Request) (*Response, error)
 
-// http handler
+// httpHandler is a presentation for handle func of [net/http]
 type httpHandler func(http.ResponseWriter, *http.Request)
 
-// HttpServer represents a http server  include mux, logger
+// HttpServer represents a http server  include [net/http.ServeMux], [log/slog.Logger]
 type HttpServer struct {
 	*http.ServeMux
 	logger     *slog.Logger
@@ -53,7 +54,7 @@ func NewHttpServer(endpoint *configs.Endpoint, logger *slog.Logger) *HttpServer 
 
 // Start will start server and matching with processors pattern
 func (s *HttpServer) Start(ctx context.Context) error {
-	s.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	s.HandleFunc(string(filepath.Separator), func(w http.ResponseWriter, r *http.Request) {
 		for route, next := range s.handlerMap {
 			_, path, _ := strings.Cut(route, " ")
 			if isMatchPath(path, r.URL.Path) {

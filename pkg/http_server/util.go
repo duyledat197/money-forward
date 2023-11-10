@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 )
 
-const slash = "/"
+const slash = string(filepath.Separator)
 
 // joinPath returns and joining string by method and path with a space between
 func joinPath(method, path string) string {

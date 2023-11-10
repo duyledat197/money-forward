@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"user-management/internal/entities"
 	"user-management/internal/repositories"
@@ -12,6 +13,8 @@ import (
 	"user-management/pkg/database"
 	"user-management/pkg/id_utils"
 	"user-management/pkg/postgres_client"
+
+	"github.com/hashicorp/golang-lru/v2/expirable"
 )
 
 type UserService interface {
@@ -25,6 +28,9 @@ type userService struct {
 	pgClient    *postgres_client.PostgresClient
 	idGenerator id_utils.IDGenerator
 
+	// using memories cache for user entity
+	userCache *expirable.LRU[int64, *entities.User]
+
 	userRepo interface {
 		Create(ctx context.Context, db database.Executor, data *entities.User) error
 		GetUserByID(ctx context.Context, db database.Executor, id int64) (*entities.User, error)
@@ -35,8 +41,11 @@ type userService struct {
 func NewUserService(pgClient *postgres_client.PostgresClient, idGenerator id_utils.IDGenerator) UserService {
 	return &userService{
 		pgClient:    pgClient,
-		userRepo:    repositories.NewUserRepository(),
 		idGenerator: idGenerator,
+		userCache:   expirable.NewLRU[int64, *entities.User](128, nil, 24*time.Hour),
+
+		// for repositories
+		userRepo: repositories.NewUserRepository(),
 	}
 }
 
@@ -73,10 +82,18 @@ func (s *userService) CreateUser(ctx context.Context, data *entities.User) (int6
 }
 
 func (s *userService) GetUserByID(ctx context.Context, id int64) (*entities.User, error) {
+	// If user exists in cache, we no need call to database.
+	if data, ok := s.userCache.Get(id); ok {
+		return data, nil
+	}
+
 	data, err := s.userRepo.GetUserByID(ctx, s.pgClient, id)
 	if err != nil {
 		return nil, err
 	}
+
+	// cache user entity by id
+	s.userCache.Add(id, data)
 
 	return data, nil
 }

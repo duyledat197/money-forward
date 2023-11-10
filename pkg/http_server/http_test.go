@@ -14,7 +14,6 @@ import (
 )
 
 func Test_retrieveDataFromRequest(t *testing.T) {
-
 	mockBody := struct {
 		Name string `json:"name"`
 		Age  int    `json:"age"`
