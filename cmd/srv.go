@@ -9,14 +9,13 @@ import (
 	"user-management/configs"
 	deliveries "user-management/internal/deliveries/http"
 	"user-management/internal/entities"
-	"user-management/internal/repositories"
 	"user-management/internal/services"
+	"user-management/pkg/cache"
 	"user-management/pkg/http_server"
 	"user-management/pkg/id_utils"
+	"user-management/pkg/lru"
 	"user-management/pkg/postgres_client"
 	"user-management/pkg/processor"
-
-	"github.com/hashicorp/golang-lru/v2/expirable"
 )
 
 var (
@@ -24,7 +23,7 @@ var (
 	httpServer     *http_server.HttpServer
 	postgresClient *postgres_client.PostgresClient
 
-	userCache *expirable.LRU[int64, *entities.User]
+	userCache cache.Cache[int64, *entities.User]
 
 	idGenerator id_utils.IDGenerator
 
@@ -49,7 +48,7 @@ func loadHttpServer() {
 }
 
 func loadCaches() {
-	userCache = expirable.NewLRU[int64, *entities.User](128, nil, 24*time.Hour)
+	userCache = lru.NewLRU[int64, *entities.User](128, 24*time.Hour)
 }
 
 func loadPostgresClient() {
@@ -61,8 +60,6 @@ func loadServices() {
 		postgresClient,
 		idGenerator,
 		userCache,
-		repositories.NewUserRepository(),
-		repositories.NewAccountRepository(),
 	)
 }
 

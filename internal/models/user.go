@@ -37,7 +37,6 @@ type CreateAccountByUserIDResponse struct {
 }
 
 type ListAccountByUserIDRequest struct {
-	*Paging
 	UserID int64 `json:"user_id"`
 }
 

@@ -106,7 +106,7 @@ func (d *userDelivery) ListAccountByUserID(ctx context.Context, req *models.List
 		return nil, fmt.Errorf("user id must not be empty")
 	}
 
-	accounts, err := d.userService.ListAccountByID(ctx, req.UserID, req.Paging)
+	accounts, err := d.userService.ListAccountByID(ctx, req.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve accounts by user id: %w", err)
 	}

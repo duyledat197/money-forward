@@ -7,16 +7,15 @@ import (
 	"fmt"
 
 	"user-management/internal/entities"
-	"user-management/internal/models"
+	"user-management/internal/repositories"
+	"user-management/pkg/cache"
 	"user-management/pkg/crypto_utils"
 	"user-management/pkg/database"
 	"user-management/pkg/id_utils"
 	"user-management/pkg/postgres_client"
-
-	"github.com/hashicorp/golang-lru/v2/expirable"
 )
 
-// UserService is an exporter to used for other layers.
+// UserService is a service exporter to used for other layers.
 type UserService interface {
 	CreateUser(context.Context, *entities.User) (int64, error)
 	GetUserByID(context.Context, int64) (*entities.User, error)
@@ -24,7 +23,7 @@ type UserService interface {
 
 	// for account
 	CreateAccount(ctx context.Context, data *entities.Account) (int64, error)
-	ListAccountByID(ctx context.Context, id int64, paging *models.Paging) ([]*entities.Account, error)
+	ListAccountByID(ctx context.Context, id int64) ([]*entities.Account, error)
 }
 
 // userService is a representation of service that implements business logic for user domain.
@@ -34,18 +33,26 @@ type userService struct {
 	idGenerator id_utils.IDGenerator
 
 	// using memories cache for user entity
-	userCache *expirable.LRU[int64, *entities.User]
+	userCache cache.Cache[int64, *entities.User]
 
-	userRepo    userRepo
-	accountRepo accountRepo
+	userRepo interface {
+		Create(ctx context.Context, db database.Executor, data *entities.User) error
+		UpdateByID(ctx context.Context, db database.Executor, id int64, data *entities.User) error
+		GetUserByID(ctx context.Context, db database.Executor, id int64) (*entities.User, error)
+		GetUserByUserName(ctx context.Context, db database.Executor, userName string) (*entities.User, error)
+		DeleteByID(ctx context.Context, db database.Executor, id int64) error
+	}
+	accountRepo interface {
+		Create(ctx context.Context, db database.Executor, data *entities.Account) error
+		ListAccountByUserID(ctx context.Context, db database.Executor, userID int64) ([]*entities.Account, error)
+	}
 }
 
 func NewUserService(
 	pgClient *postgres_client.PostgresClient,
 	idGenerator id_utils.IDGenerator,
-	userCache *expirable.LRU[int64, *entities.User],
-	userRepo userRepo,
-	accountRepo accountRepo,
+	userCache cache.Cache[int64, *entities.User],
+
 ) UserService {
 	return &userService{
 		pgClient:    pgClient,
@@ -53,22 +60,9 @@ func NewUserService(
 		userCache:   userCache,
 
 		// for repositories
-		userRepo:    userRepo,
-		accountRepo: accountRepo,
+		userRepo:    repositories.NewUserRepository(),
+		accountRepo: repositories.NewAccountRepository(),
 	}
-}
-
-type userRepo interface {
-	Create(ctx context.Context, db database.Executor, data *entities.User) error
-	UpdateByID(ctx context.Context, db database.Executor, id int64, data *entities.User) error
-	GetUserByID(ctx context.Context, db database.Executor, id int64) (*entities.User, error)
-	GetUserByUserName(ctx context.Context, db database.Executor, userName string) (*entities.User, error)
-	DeleteByID(ctx context.Context, db database.Executor, id int64) error
-}
-
-type accountRepo interface {
-	Create(ctx context.Context, db database.Executor, data *entities.Account) error
-	ListAccountByUserID(ctx context.Context, db database.Executor, userID int64) ([]*entities.Account, error)
 }
 
 // CreateUser is implementation to business logic for create user.
@@ -106,7 +100,7 @@ func (s *userService) CreateUser(ctx context.Context, data *entities.User) (int6
 
 func (s *userService) GetUserByID(ctx context.Context, id int64) (*entities.User, error) {
 	// If user exists in cache, we no need call to database.
-	if data, ok := s.userCache.Get(id); ok {
+	if data, err := s.userCache.Get(ctx, id); err == nil {
 		return data, nil
 	}
 
@@ -116,7 +110,7 @@ func (s *userService) GetUserByID(ctx context.Context, id int64) (*entities.User
 	}
 
 	// cache user entity by id
-	s.userCache.Add(id, data)
+	s.userCache.Add(ctx, id, data)
 
 	return data, nil
 }
@@ -129,7 +123,7 @@ func (s *userService) Update(ctx context.Context, data *entities.User) error {
 	}
 
 	// remove from cache because user info changed
-	s.userCache.Remove(data.ID)
+	s.userCache.Remove(ctx, data.ID)
 
 	return nil
 }
@@ -141,7 +135,7 @@ func (s *userService) DeleteByID(ctx context.Context, id int64) error {
 	}
 
 	// remove from cache because user info removed
-	s.userCache.Remove(id)
+	s.userCache.Remove(ctx, id)
 
 	return nil
 }
@@ -166,12 +160,12 @@ func (s *userService) CreateAccount(ctx context.Context, data *entities.Account)
 		return 0, err
 	}
 
-	s.userCache.Remove(data.ID)
+	s.userCache.Remove(ctx, data.ID)
 
 	return data.ID, nil
 }
 
-func (s *userService) ListAccountByID(ctx context.Context, id int64, paging *models.Paging) ([]*entities.Account, error) {
+func (s *userService) ListAccountByID(ctx context.Context, id int64) ([]*entities.Account, error) {
 	// checking use existed
 	if _, err := s.userRepo.GetUserByID(ctx, s.pgClient, id); err != nil {
 		// custom exists user error
