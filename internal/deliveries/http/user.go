@@ -81,8 +81,9 @@ func (d *userDelivery) GetUserByID(ctx context.Context, req *models.GetUserByIDR
 	}
 
 	return &models.GetUserByIDResponse{
-		ID:   data.ID,
-		Name: data.Name.String,
+		ID:         data.ID,
+		Name:       data.Name.String,
+		AccountIDs: data.AccountIDs,
 	}, nil
 }
 

@@ -30,7 +30,7 @@ var (
 	httpServer     *http_server.HttpServer
 	postgresClient *postgres_client.PostgresClient
 
-	userCache cache.Cache[int64, *entities.User]
+	userCache cache.Cache[int64, *entities.UserWithAccounts]
 
 	idGenerator id_utils.IDGenerator
 
@@ -62,7 +62,7 @@ func loadHttpServer() {
 }
 
 func loadCaches() {
-	userCache = lru.NewLRU[int64, *entities.User](128, 24*time.Hour)
+	userCache = lru.NewLRU[int64, *entities.UserWithAccounts](128, 24*time.Hour)
 }
 
 func loadPostgresClient() {

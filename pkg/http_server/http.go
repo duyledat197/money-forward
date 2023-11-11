@@ -1,5 +1,4 @@
-// Package http_server provides an easy implementation handler
-// for http server with register handle by method, path, generic handler
+// Package http_server provides some quick implementation handler used http handler.
 package http_server
 
 import (
@@ -19,13 +18,12 @@ import (
 
 // handler is a presentation for a implementation of a delivery API.
 // handler returns a response or error with passing context and request in parameters.
-// We defined handler as a common pattern for all deliveries.
 type handler[Request, Response any] func(context.Context, *Request) (*Response, error)
 
 // httpHandler is a presentation for handle func of [net/http]
 type httpHandler func(http.ResponseWriter, *http.Request)
 
-// HttpServer represents a http server  include [net/http.ServeMux], [user-management/Logger]
+// HttpServer represents a http server include [net/http.ServeMux], [user-management/Logger]
 type HttpServer struct {
 	logger     logger.Logger
 	endpoint   *configs.Endpoint
@@ -53,8 +51,9 @@ func (s *HttpServer) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc(slash, func(w http.ResponseWriter, r *http.Request) {
 		for route, next := range s.handlerMap {
-			_, path, _ := strings.Cut(route, space)
-			if isMatchPath(path, r.URL.Path) {
+			method, path, _ := strings.Cut(route, space)
+			// checking path and method is matching with route
+			if isMatchPath(path, r.URL.Path) && method == r.Method {
 				next(w, appendWildCardParams(path, r))
 				return
 			}
@@ -91,15 +90,15 @@ func Register[Request, Response any](s *HttpServer, method, path string, handler
 		http.MethodDelete,
 		http.MethodPost,
 		http.MethodPut:
-		s.handlerMap[joinPath(method, path)] = retrieveRequest(handler)
+		s.handlerMap[joinPath(method, path)] = handleRequest(handler)
 	default:
 		log.Fatalf("unsupported method %s for http server", method)
 	}
 }
 
-// retrieveRequest returns a handler with marshal all body, query, params
+// handleRequest returns a handler with marshal all body, query, params
 // from http request to request of generic handler.
-func retrieveRequest[Request, Response any](handler handler[Request, Response]) httpHandler {
+func handleRequest[Request, Response any](handler handler[Request, Response]) httpHandler {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		params, err := retrieveDataFromRequest(w, r)
@@ -107,6 +106,7 @@ func retrieveRequest[Request, Response any](handler handler[Request, Response]) 
 			errorResponse(w, http.StatusBadRequest, err)
 			return
 		}
+
 		var req Request
 		// convert all params into request struct
 		if err := reflect_utils.ConvertMapToStruct(params, &req); err != nil {
@@ -132,15 +132,16 @@ func retrieveDataFromRequest(w http.ResponseWriter, r *http.Request) (map[string
 	// retrieve data from request body with Post, Put methods
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-
 		return nil, err
 	}
 
-	bodyMap := make(map[string]any)
-	if err := json.Unmarshal(body, &bodyMap); err != nil {
-		return nil, err
+	if len(body) > 0 {
+		bodyMap := make(map[string]any)
+		if err := json.Unmarshal(body, &bodyMap); err != nil {
+			return nil, err
+		}
+		maps.Copy(params, bodyMap)
 	}
-	maps.Copy(params, bodyMap)
 
 	// retrieve data from wildcard params (ex: with "/users/{id}" we will got the value of id )
 	wildcardParams, ok := ctx.Value(&wildcardParamsKey{}).(map[string]any)

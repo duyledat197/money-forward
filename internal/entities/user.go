@@ -1,15 +1,17 @@
 package entities
 
-import "database/sql"
+import (
+	"database/sql"
+
+	"github.com/lib/pq"
+)
 
 type User struct {
-	ID        int64          `json:"id" db:"id"`
-	Name      sql.NullString `json:"name" db:"name"`
-	UserName  string         `json:"user_name" db:"user_name"`
-	Password  string         `json:"password" db:"password"`
-	Role      User_Role      `json:"role" db:"role"`
-	CreatedAt sql.NullTime   `json:"created_at" db:"created_at"`
-	UpdatedAt sql.NullTime   `json:"updated_at" db:"updated_at"`
+	ID       int64          `json:"id" db:"id"`
+	Name     sql.NullString `json:"name" db:"name"`
+	UserName string         `json:"user_name" db:"user_name"`
+	Password string         `json:"password" db:"password"`
+	Role     User_Role      `json:"role" db:"role"`
 }
 
 func (u *User) TableName() string {
@@ -28,3 +30,9 @@ const (
 var (
 	UserRoleList = []User_Role{SuperAdminRole, AdminRole, UserRole}
 )
+
+// UserWithAccounts is [User] extension with account id list inside.
+type UserWithAccounts struct {
+	User
+	AccountIDs pq.Int64Array `json:"account_ids" db:"account_ids"`
+}

@@ -32,14 +32,41 @@ func (r *AccountRepository) Create(ctx context.Context, db database.Executor, da
 
 // ListAccountByUserID is an implementation of listing user by id from database.
 func (r *AccountRepository) ListAccountByUserID(ctx context.Context, db database.Executor, userID int64) ([]*entities.Account, error) {
-	return nil, nil
+	var result []*entities.Account
+	e := &entities.Account{}
+	fieldNames, _ := database.FieldMap(e)
+	stmt := fmt.Sprintf(`
+		SELECT %s
+		FROM %s 
+		WHERE user_id = $1
+	`, strings.Join(fieldNames, ", "), e.TableName())
+	rows, err := db.QueryContext(ctx, stmt, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var item entities.Account
+		_, values := database.FieldMap(&item)
+		if err := rows.Scan(values...); err != nil {
+			return nil, err
+		}
+
+		result = append(result, &item)
+	}
+
+	return result, nil
 }
 
 func (r *AccountRepository) GetAccountByID(ctx context.Context, db database.Executor, id int64) (*entities.Account, error) {
 	var result entities.Account
 	fieldNames, values := database.FieldMap(&result)
 	stmt := fmt.Sprintf(`
-		SELECT(%s) 
+		SELECT %s
 		FROM %s 
 		WHERE id = $1
 	`, strings.Join(fieldNames, ", "), result.TableName())

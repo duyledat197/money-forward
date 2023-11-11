@@ -18,7 +18,7 @@ import (
 // UserService is a service exporter to used for other layers.
 type UserService interface {
 	CreateUser(context.Context, *entities.User) (int64, error)
-	GetUserByID(context.Context, int64) (*entities.User, error)
+	GetUserByID(context.Context, int64) (*entities.UserWithAccounts, error)
 	Update(ctx context.Context, data *entities.User) error
 
 	// for account
@@ -33,12 +33,12 @@ type userService struct {
 	idGenerator id_utils.IDGenerator
 
 	// using memories cache for user entity
-	userCache cache.Cache[int64, *entities.User]
+	userCache cache.Cache[int64, *entities.UserWithAccounts]
 
 	userRepo interface {
 		Create(ctx context.Context, db database.Executor, data *entities.User) error
 		UpdateByID(ctx context.Context, db database.Executor, id int64, data *entities.User) error
-		GetUserByID(ctx context.Context, db database.Executor, id int64) (*entities.User, error)
+		GetUserByID(ctx context.Context, db database.Executor, id int64) (*entities.UserWithAccounts, error)
 		GetUserByUserName(ctx context.Context, db database.Executor, userName string) (*entities.User, error)
 		DeleteByID(ctx context.Context, db database.Executor, id int64) error
 	}
@@ -51,7 +51,7 @@ type userService struct {
 func NewUserService(
 	pgClient *postgres_client.PostgresClient,
 	idGenerator id_utils.IDGenerator,
-	userCache cache.Cache[int64, *entities.User],
+	userCache cache.Cache[int64, *entities.UserWithAccounts],
 
 ) UserService {
 	return &userService{
@@ -69,15 +69,11 @@ func NewUserService(
 func (s *userService) CreateUser(ctx context.Context, data *entities.User) (int64, error) {
 	// If user exists we should return an existed user error
 	existedUser, err := s.userRepo.GetUserByUserName(ctx, s.pgClient, data.UserName)
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return 0, err
 	}
 	if existedUser != nil {
 		return 0, fmt.Errorf("username already exists")
-	}
-	// If error is not no rows error it means unpredicted error
-	if !errors.Is(err, sql.ErrNoRows) {
-		return 0, err
 	}
 
 	// We should storing a hashed password to user table
@@ -98,7 +94,7 @@ func (s *userService) CreateUser(ctx context.Context, data *entities.User) (int6
 	return data.ID, nil
 }
 
-func (s *userService) GetUserByID(ctx context.Context, id int64) (*entities.User, error) {
+func (s *userService) GetUserByID(ctx context.Context, id int64) (*entities.UserWithAccounts, error) {
 	// If user exists in cache, we no need call to database.
 	if data, err := s.userCache.Get(ctx, id); err == nil {
 		return data, nil

@@ -1,14 +1,22 @@
 package id_utils
 
-import "github.com/bwmarrin/snowflake"
+import (
+	"log"
 
+	"github.com/bwmarrin/snowflake"
+)
+
+// snowFlake is a presentation of [github.com/bwmarrin/snowflake] id generator.
 type snowFlake struct {
 	generator *snowflake.Node
 }
 
+// NewSnowFlake returns an [snowFlake] that implements [IDGenerator].
 func NewSnowFlake(nodeID int64) IDGenerator {
-	generator, _ := snowflake.NewNode(nodeID)
-
+	generator, err := snowflake.NewNode(nodeID)
+	if err != nil {
+		log.Fatalf("unable to create snowflake: %v", err)
+	}
 	return &snowFlake{
 		generator: generator,
 	}

@@ -6,5 +6,6 @@ import "database/sql"
 func NullString(str string) sql.NullString {
 	var result sql.NullString
 	result.Scan(str)
+
 	return result
 }
