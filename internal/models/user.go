@@ -19,3 +19,19 @@ type GetUserByIDResponse struct {
 	Name       string  `json:"name"`
 	AccountIDs []int64 `json:"account_ids"`
 }
+
+type UpdateUserRequest struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+type UpdateUserResponse struct {
+}
+
+type CreateAccountByUserIDRequest struct {
+	UserID  int64  `json:"user_id"`
+	Name    string `json:"name"`
+	Balance int    `json:"balance"`
+}
+type CreateAccountByUserIDResponse struct {
+	ID int64 `json:"id"`
+}

@@ -5,19 +5,26 @@ import (
 	"log/slog"
 	"math/rand"
 	"os"
+	"time"
 	"user-management/configs"
 	deliveries "user-management/internal/deliveries/http"
+	"user-management/internal/entities"
+	"user-management/internal/repositories"
 	"user-management/internal/services"
 	"user-management/pkg/http_server"
 	"user-management/pkg/id_utils"
 	"user-management/pkg/postgres_client"
 	"user-management/pkg/processor"
+
+	"github.com/hashicorp/golang-lru/v2/expirable"
 )
 
 var (
 	logger         *slog.Logger
 	httpServer     *http_server.HttpServer
 	postgresClient *postgres_client.PostgresClient
+
+	userCache *expirable.LRU[int64, *entities.User]
 
 	idGenerator id_utils.IDGenerator
 
@@ -39,7 +46,10 @@ func loadHttpServer() {
 	httpServer = http_server.NewHttpServer(&configs.Endpoint{
 		Port: "8080",
 	}, logger)
+}
 
+func loadCaches() {
+	userCache = expirable.NewLRU[int64, *entities.User](128, nil, 24*time.Hour)
 }
 
 func loadPostgresClient() {
@@ -47,7 +57,13 @@ func loadPostgresClient() {
 }
 
 func loadServices() {
-	userService = services.NewUserService(postgresClient, idGenerator)
+	userService = services.NewUserService(
+		postgresClient,
+		idGenerator,
+		userCache,
+		repositories.NewUserRepository(),
+		repositories.NewAccountRepository(),
+	)
 }
 
 func registerHandlers() {
@@ -67,6 +83,7 @@ func loadDefault() {
 	loadLogger()
 	loadIDGenerator()
 	loadPostgresClient()
+	loadCaches()
 	loadServices()
 	loadHttpServer()
 

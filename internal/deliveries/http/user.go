@@ -9,6 +9,7 @@ import (
 	"user-management/internal/entities"
 	"user-management/internal/models"
 	"user-management/internal/services"
+	"user-management/pkg/database"
 	"user-management/pkg/http_server"
 	"user-management/pkg/reflect_utils"
 )
@@ -19,6 +20,7 @@ type userDelivery struct {
 	userService services.UserService
 }
 
+// RegisterUserDelivery is registration of user delivery APIs to http server.
 func RegisterUserDelivery(
 	server *http_server.HttpServer,
 	userService services.UserService,
@@ -30,6 +32,9 @@ func RegisterUserDelivery(
 
 	http_server.Register(server, http.MethodPost, "/users", delivery.CreateUser)
 	http_server.Register(server, http.MethodGet, "/users/{id}", delivery.GetUserByID)
+	http_server.Register(server, http.MethodPut, "/users/{id}", delivery.UpdateUser)
+
+	http_server.Register(server, http.MethodPost, "/users/{id}", delivery.CreateAccountByUserID)
 }
 
 func (d *userDelivery) CreateUser(ctx context.Context, req *models.CreateUserRequest) (*models.CreateUserResponse, error) {
@@ -73,10 +78,40 @@ func (d *userDelivery) GetUserByID(ctx context.Context, req *models.GetUserByIDR
 		return nil, fmt.Errorf("unable to retrieve user by id: %w", err)
 	}
 
-	resp := &models.GetUserByIDResponse{
+	return &models.GetUserByIDResponse{
 		ID:   data.ID,
 		Name: data.Name.String,
+	}, nil
+}
+
+func (d *userDelivery) UpdateUser(ctx context.Context, req *models.UpdateUserRequest) (*models.UpdateUserResponse, error) {
+	if req.ID == 0 {
+		return nil, fmt.Errorf("id must not be empty")
 	}
 
-	return resp, nil
+	if err := d.userService.Update(ctx, &entities.User{
+		ID:   req.ID,
+		Name: database.NullString(req.Name),
+	}); err != nil {
+		return nil, fmt.Errorf("unable to update user by id: %w", err)
+	}
+
+	return &models.UpdateUserResponse{}, nil
+}
+
+func (d *userDelivery) CreateAccountByUserID(ctx context.Context, req *models.CreateAccountByUserIDRequest) (*models.CreateAccountByUserIDResponse, error) {
+	if req.UserID == 0 {
+		return nil, fmt.Errorf("user id must not be empty")
+	}
+	id, err := d.userService.CreateAccount(ctx, &entities.Account{
+		Name:   database.NullString(req.Name),
+		UserID: req.UserID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to update user by id: %w", err)
+	}
+
+	return &models.CreateAccountByUserIDResponse{
+		ID: id,
+	}, nil
 }
