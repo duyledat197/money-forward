@@ -10,16 +10,12 @@ import (
 	"log"
 	"maps"
 	"net/http"
-	"path/filepath"
-	"regexp"
 	"strings"
 
 	"user-management/configs"
 	"user-management/pkg/logger"
 	"user-management/pkg/reflect_utils"
 )
-
-var re = regexp.MustCompile(`\{(.*?)\}`)
 
 // handler is a presentation for a implementation of a delivery API.
 // handler returns a response or error with passing context and request in parameters.
@@ -31,7 +27,6 @@ type httpHandler func(http.ResponseWriter, *http.Request)
 
 // HttpServer represents a http server  include [net/http.ServeMux], [user-management/Logger]
 type HttpServer struct {
-	// *http.ServeMux
 	logger     logger.Logger
 	endpoint   *configs.Endpoint
 	handlerMap map[string]httpHandler
@@ -39,31 +34,26 @@ type HttpServer struct {
 	options    []Option
 }
 
+// NewHttpServer returns a custom http server, used to serve a http server.
 func NewHttpServer(
 	endpoint *configs.Endpoint,
 	logger logger.Logger,
 	opts ...Option,
 ) *HttpServer {
-	mux := http.NewServeMux()
 	return &HttpServer{
-		// mux,
-		logger,
-		endpoint,
-		make(map[string]httpHandler),
-		&http.Server{
-			Handler: mux,
-			Addr:    endpoint.Address(),
-		},
-		opts,
+		logger:     logger,
+		endpoint:   endpoint,
+		handlerMap: make(map[string]httpHandler),
+		options:    opts,
 	}
 }
 
 // Start will start server and matching with processors pattern
 func (s *HttpServer) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
-	mux.HandleFunc(string(filepath.Separator), func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(slash, func(w http.ResponseWriter, r *http.Request) {
 		for route, next := range s.handlerMap {
-			_, path, _ := strings.Cut(route, " ")
+			_, path, _ := strings.Cut(route, space)
 			if isMatchPath(path, r.URL.Path) {
 				next(w, appendWildCardParams(path, r))
 				return
@@ -73,12 +63,14 @@ func (s *HttpServer) Start(ctx context.Context) error {
 	})
 
 	var handler http.Handler = mux
+
+	// Merge all middleware handlers into one that can using for register to http server.
 	for _, o := range s.options {
 		handler = o.Wrap(handler)
 	}
 
 	s.logger.Info("server listening in", "address", s.endpoint.Address())
-	if err := s.server.ListenAndServe(); err != nil {
+	if err := http.ListenAndServe(s.endpoint.Address(), handler); err != nil {
 		return err
 	}
 
@@ -105,7 +97,8 @@ func Register[Request, Response any](s *HttpServer, method, path string, handler
 	}
 }
 
-// retrieveRequest returns a handler with marshal all body, query, params from http request to request of generic handler
+// retrieveRequest returns a handler with marshal all body, query, params
+// from http request to request of generic handler.
 func retrieveRequest[Request, Response any](handler handler[Request, Response]) httpHandler {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -115,10 +108,12 @@ func retrieveRequest[Request, Response any](handler handler[Request, Response]) 
 			return
 		}
 		var req Request
+		// convert all params into request struct
 		if err := reflect_utils.ConvertMapToStruct(params, &req); err != nil {
 			errorResponse(w, http.StatusInternalServerError, err)
 			return
 		}
+
 		resp, err := handler(ctx, &req)
 		if err != nil {
 			errorResponse(w, http.StatusBadRequest, err)
@@ -129,6 +124,7 @@ func retrieveRequest[Request, Response any](handler handler[Request, Response]) 
 	}
 }
 
+// retrieveDataFromRequest returns a map that is all query params and body converted from request.
 func retrieveDataFromRequest(w http.ResponseWriter, r *http.Request) (map[string]any, error) {
 	ctx := r.Context()
 	params := make(map[string]any)

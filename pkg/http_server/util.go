@@ -4,11 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"strings"
 )
-
-const slash = string(filepath.Separator)
 
 // joinPath returns and joining string by method and path with a space between
 func joinPath(method, path string) string {
@@ -25,7 +22,7 @@ func isMatchPath(pattern, source string) bool {
 	}
 	isMatch := true
 	for i, el := range patternEls {
-		isMatch = isMatch && (re.MatchString(el) || el == sourceEls[i])
+		isMatch = isMatch && (bracketRegex.MatchString(el) || el == sourceEls[i])
 	}
 
 	return isMatch
@@ -39,7 +36,7 @@ func appendWildCardParams(pattern string, r *http.Request) *http.Request {
 	patternEls := strings.Split(strings.Trim(pattern, slash), slash)
 	sourceEls := strings.Split(strings.Trim(r.URL.Path, slash), slash)
 	for i, el := range patternEls {
-		if re.MatchString(el) {
+		if bracketRegex.MatchString(el) {
 			val := strings.TrimLeft(el, "{")
 			val = strings.TrimRight(val, "}")
 			result[val] = sourceEls[i]
