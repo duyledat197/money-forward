@@ -1,0 +1,47 @@
+version: "3.4"
+
+services:
+  postgres:
+    container_name: postgres_container
+    image: postgres:13-alpine
+    env_file:
+      - ./docker.env
+    environment:
+      PGDATA: /data/postgres
+      POSTGRES_DB: ${DB_NAME}
+      DATABASE_HOST: ${DB_HOST}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    networks:
+      - postgres
+    restart: unless-stopped
+
+  migrate:
+    image: migrate/migrate
+    env_file:
+      - ./docker.env
+    volumes:
+      - "../migrations:/migrations/"
+    networks:
+      - postgres
+    command:
+      [
+        "-path",
+        "/migrations",
+        "-database",
+        "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable",
+        "up",
+      ]
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 3037:8080
+    networks:
+      - postgres
+networks:
+  postgres:
+    driver: bridge

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"log/slog"
 	"maps"
 	"net/http"
 	"path/filepath"
@@ -16,6 +15,7 @@ import (
 	"strings"
 
 	"user-management/configs"
+	"user-management/pkg/logger"
 	"user-management/pkg/reflect_utils"
 )
 
@@ -29,16 +29,16 @@ type handler[Request, Response any] func(context.Context, *Request) (*Response, 
 // httpHandler is a presentation for handle func of [net/http]
 type httpHandler func(http.ResponseWriter, *http.Request)
 
-// HttpServer represents a http server  include [net/http.ServeMux], [log/slog.Logger]
+// HttpServer represents a http server  include [net/http.ServeMux], [user-management/Logger]
 type HttpServer struct {
 	*http.ServeMux
-	logger     *slog.Logger
+	logger     logger.Logger
 	endpoint   *configs.Endpoint
 	handlerMap map[string]httpHandler
 	server     *http.Server
 }
 
-func NewHttpServer(endpoint *configs.Endpoint, logger *slog.Logger) *HttpServer {
+func NewHttpServer(endpoint *configs.Endpoint, logger logger.Logger) *HttpServer {
 	mux := http.NewServeMux()
 	return &HttpServer{
 		mux,
@@ -66,7 +66,7 @@ func (s *HttpServer) Start(ctx context.Context) error {
 
 	})
 
-	s.logger.InfoContext(ctx, "server listening in", "address", s.endpoint.Address())
+	s.logger.Info("server listening in", "address", s.endpoint.Address())
 	if err := s.server.ListenAndServe(); err != nil {
 		return err
 	}

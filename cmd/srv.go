@@ -6,6 +6,9 @@ import (
 	"math/rand"
 	"os"
 	"time"
+
+	l "log"
+
 	"user-management/configs"
 	deliveries "user-management/internal/deliveries/http"
 	"user-management/internal/entities"
@@ -13,13 +16,17 @@ import (
 	"user-management/pkg/cache"
 	"user-management/pkg/http_server"
 	"user-management/pkg/id_utils"
+	log "user-management/pkg/logger"
 	"user-management/pkg/lru"
 	"user-management/pkg/postgres_client"
 	"user-management/pkg/processor"
+
+	"github.com/lmittmann/tint"
 )
 
 var (
-	logger         *slog.Logger
+	cfgs           *configs.Config
+	logger         log.Logger
 	httpServer     *http_server.HttpServer
 	postgresClient *postgres_client.PostgresClient
 
@@ -33,8 +40,17 @@ var (
 	factories  []processor.Factory
 )
 
+func loadConfigs() {
+	var err error
+	cfgs, err = configs.LoadConfig("developments", "dev")
+	if err != nil {
+		l.Fatalln(err.Error())
+	}
+	l.Println(cfgs.PostgresDB.Address())
+}
+
 func loadLogger() {
-	logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger = slog.New(tint.NewHandler(os.Stdout, nil))
 }
 
 func loadIDGenerator() {
@@ -42,9 +58,7 @@ func loadIDGenerator() {
 }
 
 func loadHttpServer() {
-	httpServer = http_server.NewHttpServer(&configs.Endpoint{
-		Port: "8080",
-	}, logger)
+	httpServer = http_server.NewHttpServer(cfgs.HTTP, logger)
 }
 
 func loadCaches() {
@@ -52,7 +66,7 @@ func loadCaches() {
 }
 
 func loadPostgresClient() {
-	postgresClient = postgres_client.NewPostgresClient("")
+	postgresClient = postgres_client.NewPostgresClient(cfgs.PostgresDB.Address())
 }
 
 func loadServices() {
@@ -77,6 +91,7 @@ func registerProcessors() {
 
 func loadDefault() {
 	// loader
+	loadConfigs()
 	loadLogger()
 	loadIDGenerator()
 	loadPostgresClient()
@@ -91,6 +106,8 @@ func loadDefault() {
 }
 
 func start(ctx context.Context, errChan chan error) {
+	logger.Info("processors", len(processors))
+	logger.Info("factories", len(factories))
 	for _, f := range factories {
 		if err := f.Connect(ctx); err != nil {
 			errChan <- err
@@ -98,6 +115,7 @@ func start(ctx context.Context, errChan chan error) {
 	}
 
 	for _, p := range processors {
+		logger.Info("start")
 		go func(pr processor.Processor) {
 			if err := pr.Start(ctx); err != nil {
 				errChan <- err

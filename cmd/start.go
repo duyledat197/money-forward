@@ -24,6 +24,7 @@ to quickly create a Cobra application.`,
 		start(ctx, errChan)
 		err := <-errChan
 		if err != nil {
+			logger.Error(err.Error())
 			stop(ctx)
 		}
 	},

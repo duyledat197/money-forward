@@ -7,9 +7,16 @@ type Database struct {
 	Port     string
 	User     string
 	Password string
-	Schema   string
+	Database string
 }
 
 func (e *Database) Address() string {
-	return fmt.Sprintf("%s:%s", e.Host, e.Port)
+	return fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		e.Host,
+		e.Port,
+		e.User,
+		e.Password,
+		e.Database,
+	)
 }
