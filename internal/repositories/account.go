@@ -29,3 +29,8 @@ func (r *AccountRepository) Create(ctx context.Context, db database.Executor, da
 
 	return nil
 }
+
+// ListAccountByUserID is an implementation of listing user by id from database.
+func (r *AccountRepository) ListAccountByUserID(ctx context.Context, db database.Executor, userID int64) ([]*entities.Account, error) {
+	return nil, nil
+}

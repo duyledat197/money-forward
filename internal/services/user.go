@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"user-management/internal/entities"
+	"user-management/internal/models"
 	"user-management/pkg/crypto_utils"
 	"user-management/pkg/database"
 	"user-management/pkg/id_utils"
@@ -23,6 +24,7 @@ type UserService interface {
 
 	// for account
 	CreateAccount(ctx context.Context, data *entities.Account) (int64, error)
+	ListAccountByID(ctx context.Context, id int64, paging *models.Paging) ([]*entities.Account, error)
 }
 
 // userService is a representation of service that implements business logic for user domain.
@@ -66,6 +68,7 @@ type userRepo interface {
 
 type accountRepo interface {
 	Create(ctx context.Context, db database.Executor, data *entities.Account) error
+	ListAccountByUserID(ctx context.Context, db database.Executor, userID int64) ([]*entities.Account, error)
 }
 
 // CreateUser is implementation to business logic for create user.
@@ -125,6 +128,9 @@ func (s *userService) Update(ctx context.Context, data *entities.User) error {
 		return err
 	}
 
+	// remove from cache because user info changed
+	s.userCache.Remove(data.ID)
+
 	return nil
 }
 
@@ -134,11 +140,15 @@ func (s *userService) DeleteByID(ctx context.Context, id int64) error {
 		return err
 	}
 
+	// remove from cache because user info removed
+	s.userCache.Remove(id)
+
 	return nil
 }
 
 // CreateAccount is implementation to business logic for create account by user id.
 func (s *userService) CreateAccount(ctx context.Context, data *entities.Account) (int64, error) {
+	// checking use existed
 	if _, err := s.userRepo.GetUserByID(ctx, s.pgClient, data.UserID); err != nil {
 		// custom exists user error
 		if errors.Is(err, sql.ErrNoRows) {
@@ -156,5 +166,26 @@ func (s *userService) CreateAccount(ctx context.Context, data *entities.Account)
 		return 0, err
 	}
 
+	s.userCache.Remove(data.ID)
+
 	return data.ID, nil
+}
+
+func (s *userService) ListAccountByID(ctx context.Context, id int64, paging *models.Paging) ([]*entities.Account, error) {
+	// checking use existed
+	if _, err := s.userRepo.GetUserByID(ctx, s.pgClient, id); err != nil {
+		// custom exists user error
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("user does not exists")
+		}
+
+		return nil, err
+	}
+
+	accounts, err := s.accountRepo.ListAccountByUserID(ctx, s.pgClient, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return accounts, nil
 }

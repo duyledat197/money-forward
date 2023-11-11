@@ -35,3 +35,10 @@ type CreateAccountByUserIDRequest struct {
 type CreateAccountByUserIDResponse struct {
 	ID int64 `json:"id"`
 }
+
+type ListAccountByUserIDRequest struct {
+	*Paging
+	UserID int64 `json:"user_id"`
+}
+
+type ListAccountByUserIDResponse []*Account

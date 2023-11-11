@@ -11,7 +11,6 @@ import (
 	"user-management/internal/services"
 	"user-management/pkg/database"
 	"user-management/pkg/http_server"
-	"user-management/pkg/reflect_utils"
 )
 
 // using skeleton with cmd (d *userDelivery UserDelivery)
@@ -34,7 +33,9 @@ func RegisterUserDelivery(
 	http_server.Register(server, http.MethodGet, "/users/{id}", delivery.GetUserByID)
 	http_server.Register(server, http.MethodPut, "/users/{id}", delivery.UpdateUser)
 
-	http_server.Register(server, http.MethodPost, "/users/{id}", delivery.CreateAccountByUserID)
+	// for accounts
+	http_server.Register(server, http.MethodGet, "/users/{user_id}/accounts", delivery.ListAccountByUserID)
+	http_server.Register(server, http.MethodPost, "/users/{user_id}/accounts", delivery.CreateAccountByUserID)
 }
 
 func (d *userDelivery) CreateUser(ctx context.Context, req *models.CreateUserRequest) (*models.CreateUserResponse, error) {
@@ -54,11 +55,12 @@ func (d *userDelivery) CreateUser(ctx context.Context, req *models.CreateUserReq
 		return nil, fmt.Errorf("user role is not valid")
 	}
 
-	user := &entities.User{}
-	if err := reflect_utils.CopyStruct(req, user); err != nil {
-		return nil, fmt.Errorf("unable to copy user from req: %w", err)
-	}
-	id, err := d.userService.CreateUser(ctx, user)
+	id, err := d.userService.CreateUser(ctx, &entities.User{
+		UserName: req.UserName,
+		Name:     database.NullString(req.Name),
+		Password: req.Password,
+		Role:     entities.User_Role(req.Role),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to create user: %w", err)
 	}
@@ -99,10 +101,34 @@ func (d *userDelivery) UpdateUser(ctx context.Context, req *models.UpdateUserReq
 	return &models.UpdateUserResponse{}, nil
 }
 
+func (d *userDelivery) ListAccountByUserID(ctx context.Context, req *models.ListAccountByUserIDRequest) (*models.ListAccountByUserIDResponse, error) {
+	if req.UserID == 0 {
+		return nil, fmt.Errorf("user id must not be empty")
+	}
+
+	accounts, err := d.userService.ListAccountByID(ctx, req.UserID, req.Paging)
+	if err != nil {
+		return nil, fmt.Errorf("unable to retrieve accounts by user id: %w", err)
+	}
+
+	result := make([]*models.Account, 0, len(accounts))
+
+	for _, a := range accounts {
+		result = append(result, &models.Account{
+			ID:      a.ID,
+			Name:    a.Name.String,
+			Balance: a.Balance.Int64,
+		})
+	}
+	res := models.ListAccountByUserIDResponse(result)
+	return &res, nil
+}
+
 func (d *userDelivery) CreateAccountByUserID(ctx context.Context, req *models.CreateAccountByUserIDRequest) (*models.CreateAccountByUserIDResponse, error) {
 	if req.UserID == 0 {
 		return nil, fmt.Errorf("user id must not be empty")
 	}
+
 	id, err := d.userService.CreateAccount(ctx, &entities.Account{
 		Name:   database.NullString(req.Name),
 		UserID: req.UserID,

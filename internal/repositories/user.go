@@ -30,7 +30,7 @@ func (r *UserRepository) Create(ctx context.Context, db database.Executor, data 
 	return nil
 }
 
-// GetUserByID is an implementation of retrieve user by id from database.
+// GetUserByID is an implementation of retrieving user by id from database.
 func (r *UserRepository) GetUserByID(ctx context.Context, db database.Executor, id int64) (*entities.User, error) {
 	var result entities.User
 	fieldNames, values := database.FieldMap(&result)
@@ -51,7 +51,7 @@ func (r *UserRepository) GetUserByID(ctx context.Context, db database.Executor, 
 	return &result, nil
 }
 
-// GetUserByUserName is an implementation of retrieve user by userName from database.
+// GetUserByUserName is an implementation of retrieving user by userName from database.
 func (r *UserRepository) GetUserByUserName(ctx context.Context, db database.Executor, userName string) (*entities.User, error) {
 	var result entities.User
 	fieldNames, values := database.FieldMap(&result)
@@ -72,7 +72,7 @@ func (r *UserRepository) GetUserByUserName(ctx context.Context, db database.Exec
 	return &result, nil
 }
 
-// UpdateByID is an implementation of update user by id from database.
+// UpdateByID is an implementation of updating user by id from database.
 func (r *UserRepository) UpdateByID(ctx context.Context, db database.Executor, id int64, data *entities.User) error {
 	e := &entities.User{}
 	stmt := fmt.Sprintf(`
@@ -95,7 +95,7 @@ func (r *UserRepository) UpdateByID(ctx context.Context, db database.Executor, i
 	return nil
 }
 
-// DeleteByID is an implementation of delete user by id from database.
+// DeleteByID is an implementation of deleting user by id from database.
 func (r *UserRepository) DeleteByID(ctx context.Context, db database.Executor, id int64) error {
 	e := &entities.User{}
 	stmt := fmt.Sprintf(`
