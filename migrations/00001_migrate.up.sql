@@ -6,13 +6,9 @@ CREATE TABLE IF NOT EXISTS users (
   user_name TEXT UNIQUE,
   password TEXT NOT NULL,
   "name" TEXT,
-  created_by BIGINT,
   role role_type NOT NULL,
   created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT NOW(),
-  FOREIGN KEY ("created_by") REFERENCES "users"("id") ON
-  DELETE
-    CASCADE
+  updated_at timestamptz DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS accounts (

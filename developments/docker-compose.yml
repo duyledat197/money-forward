@@ -5,7 +5,7 @@ services:
     container_name: postgres_container
     image: postgres:13-alpine
     env_file:
-      - ./docker.env
+      - .env
     environment:
       PGDATA: /data/postgres
       POSTGRES_DB: ${DB_NAME}
@@ -21,7 +21,7 @@ services:
   migrate:
     image: migrate/migrate
     env_file:
-      - ./docker.env
+      - .env
     volumes:
       - "../migrations:/migrations/"
     networks:

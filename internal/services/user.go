@@ -27,7 +27,6 @@ type UserService interface {
 }
 
 // userService is a representation of service that implements business logic for user domain.
-// For using skeleton: s *userService UserService
 type userService struct {
 	pgClient    *postgres_client.PostgresClient
 	idGenerator id_utils.IDGenerator
@@ -179,3 +178,5 @@ func (s *userService) ListAccountByID(ctx context.Context, id int64) ([]*entitie
 
 	return accounts, nil
 }
+
+// For using skeleton: s *userService UserService
