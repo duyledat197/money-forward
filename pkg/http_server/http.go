@@ -31,17 +31,22 @@ type httpHandler func(http.ResponseWriter, *http.Request)
 
 // HttpServer represents a http server  include [net/http.ServeMux], [user-management/Logger]
 type HttpServer struct {
-	*http.ServeMux
+	// *http.ServeMux
 	logger     logger.Logger
 	endpoint   *configs.Endpoint
 	handlerMap map[string]httpHandler
 	server     *http.Server
+	options    []Option
 }
 
-func NewHttpServer(endpoint *configs.Endpoint, logger logger.Logger) *HttpServer {
+func NewHttpServer(
+	endpoint *configs.Endpoint,
+	logger logger.Logger,
+	opts ...Option,
+) *HttpServer {
 	mux := http.NewServeMux()
 	return &HttpServer{
-		mux,
+		// mux,
 		logger,
 		endpoint,
 		make(map[string]httpHandler),
@@ -49,12 +54,14 @@ func NewHttpServer(endpoint *configs.Endpoint, logger logger.Logger) *HttpServer
 			Handler: mux,
 			Addr:    endpoint.Address(),
 		},
+		opts,
 	}
 }
 
 // Start will start server and matching with processors pattern
 func (s *HttpServer) Start(ctx context.Context) error {
-	s.HandleFunc(string(filepath.Separator), func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc(string(filepath.Separator), func(w http.ResponseWriter, r *http.Request) {
 		for route, next := range s.handlerMap {
 			_, path, _ := strings.Cut(route, " ")
 			if isMatchPath(path, r.URL.Path) {
@@ -63,8 +70,12 @@ func (s *HttpServer) Start(ctx context.Context) error {
 			}
 		}
 		errorResponse(w, http.StatusNotFound, fmt.Errorf("not found"))
-
 	})
+
+	var handler http.Handler = mux
+	for _, o := range s.options {
+		handler = o.Wrap(handler)
+	}
 
 	s.logger.Info("server listening in", "address", s.endpoint.Address())
 	if err := s.server.ListenAndServe(); err != nil {
