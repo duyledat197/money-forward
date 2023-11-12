@@ -56,11 +56,17 @@ type rbacMiddleware struct {
 
 func (m *rbacMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		route := joinPath(r.Method, r.URL.Path)
-		validRoles, ok := m.rbacMap[route]
-		if !ok {
-			next.ServeHTTP(w, r)
+		var validRoles []entities.User_Role
+
+		for route, roles := range m.rbacMap {
+			method, path, _ := strings.Cut(route, space)
+			// checking path and method is matching with route
+			if isMatchPath(path, r.URL.Path) && method == r.Method {
+				validRoles = roles
+				break
+			}
 		}
+
 		info, err := ExtractUserInfoFromContext(r.Context())
 		if err != nil {
 			errorResponse(w, http.StatusUnauthorized, fmt.Errorf("authorization is not valid"))
