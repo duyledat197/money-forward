@@ -58,7 +58,20 @@ func loadIDGenerator() {
 }
 
 func loadHttpServer() {
-	httpServer = http_server.NewHttpServer(cfgs.HTTP, logger)
+	httpServer = http_server.NewHttpServer(
+		cfgs.HTTP,
+		logger,
+		http_server.WithCors(), // using default allow access origin
+		http_server.WithRBAC(map[string][]entities.User_Role{
+			"POST /users":   {entities.SuperAdminRole, entities.AdminRole},
+			"PUT /users":    {entities.SuperAdminRole, entities.AdminRole},
+			"DELETE /users": {entities.SuperAdminRole, entities.AdminRole},
+
+			"POST /users/{id}/accounts": {entities.SuperAdminRole, entities.AdminRole},
+			"PUT /accounts/{id}":        {entities.SuperAdminRole, entities.AdminRole},
+			"DELETE /accounts/{id}":     {entities.SuperAdminRole, entities.AdminRole},
+		}),
+	)
 }
 
 func loadCaches() {
@@ -106,8 +119,6 @@ func loadDefault() {
 }
 
 func start(ctx context.Context, errChan chan error) {
-	logger.Info("processors", len(processors))
-	logger.Info("factories", len(factories))
 	for _, f := range factories {
 		if err := f.Connect(ctx); err != nil {
 			errChan <- err
@@ -115,7 +126,6 @@ func start(ctx context.Context, errChan chan error) {
 	}
 
 	for _, p := range processors {
-		logger.Info("start")
 		go func(pr processor.Processor) {
 			if err := pr.Start(ctx); err != nil {
 				errChan <- err

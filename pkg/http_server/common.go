@@ -11,3 +11,13 @@ const (
 )
 
 var bracketRegex = regexp.MustCompile(`\{(.*?)\}`)
+
+type (
+	wildcardParamsKey struct{}
+	userInfoKey       struct{}
+
+	UserInfo struct {
+		UserID string `json:"user_id"`
+		Role   string `json:"role"`
+	}
+)

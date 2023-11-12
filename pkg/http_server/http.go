@@ -25,24 +25,24 @@ type httpHandler func(http.ResponseWriter, *http.Request)
 
 // HttpServer represents a http server include [net/http.ServeMux], [user-management/Logger]
 type HttpServer struct {
-	logger     logger.Logger
-	endpoint   *configs.Endpoint
-	handlerMap map[string]httpHandler
-	server     *http.Server
-	options    []Option
+	logger      logger.Logger
+	endpoint    *configs.Endpoint
+	handlerMap  map[string]httpHandler
+	server      *http.Server
+	middlewares []Middleware
 }
 
 // NewHttpServer returns a custom http server, used to serve a http server.
 func NewHttpServer(
 	endpoint *configs.Endpoint,
 	logger logger.Logger,
-	opts ...Option,
+	middlewares ...Middleware,
 ) *HttpServer {
 	return &HttpServer{
-		logger:     logger,
-		endpoint:   endpoint,
-		handlerMap: make(map[string]httpHandler),
-		options:    opts,
+		logger:      logger,
+		endpoint:    endpoint,
+		handlerMap:  make(map[string]httpHandler),
+		middlewares: middlewares,
 	}
 }
 
@@ -64,8 +64,8 @@ func (s *HttpServer) Start(ctx context.Context) error {
 	var handler http.Handler = mux
 
 	// Merge all middleware handlers into one that can using for register to http server.
-	for _, o := range s.options {
-		handler = o.Wrap(handler)
+	for _, middleware := range s.middlewares {
+		handler = middleware.Wrap(handler)
 	}
 
 	s.logger.Info("server listening in", "address", s.endpoint.Address())

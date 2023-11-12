@@ -35,14 +35,13 @@ func (r *UserRepository) GetUserByID(ctx context.Context, db database.Executor, 
 	accountE := entities.Account{}
 	fieldNames, _ := database.FieldMap(&userE)
 	stmt := fmt.Sprintf(`
-		SELECT users.%[1]s, 
+		SELECT %[2]s.%[1]s, 
 		ARRAY_AGG(%[3]s.id) 
 		FILTER(WHERE %[3]s.id IS NOT NULL) 
-		OVER (partition by %[2]s.id) as account_id 
 		FROM %[2]s 
 		LEFT JOIN %[3]s ON %[2]s.id = %[3]s.user_id
 		WHERE %[2]s.id = $1
-
+		GROUP BY %[2]s.id,%[2]s.name
 	`, strings.Join(fieldNames, ", users."), userE.TableName(), accountE.TableName())
 
 	var result entities.UserWithAccounts
@@ -97,7 +96,13 @@ func (r *UserRepository) UpdateByID(ctx context.Context, db database.Executor, i
 		return err
 	}
 
-	if rowAffected, err := result.RowsAffected(); err != nil || rowAffected == 0 {
+	rowAffected, err := result.RowsAffected()
+
+	if err != nil {
+		return err
+	}
+
+	if rowAffected == 0 {
 		return fmt.Errorf("no row affected")
 	}
 
@@ -116,8 +121,13 @@ func (r *UserRepository) DeleteByID(ctx context.Context, db database.Executor, i
 	if err != nil {
 		return err
 	}
+	rowAffected, err := result.RowsAffected()
 
-	if rowAffected, err := result.RowsAffected(); err != nil || rowAffected == 0 {
+	if err != nil {
+		return err
+	}
+
+	if rowAffected == 0 {
 		return fmt.Errorf("no row affected")
 	}
 
