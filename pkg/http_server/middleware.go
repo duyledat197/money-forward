@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"user-management/internal/entities"
+	"user-management/pkg/token_utils"
 )
 
 // Middleware represents options that can be used to configure http server
@@ -34,7 +35,7 @@ func (m *corsMiddleware) Wrap(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", strings.Join(m.allowMethods, ", "))
 		w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, authorization")
-		if r.Method != "OPTIONS" {
+		if r.Method != http.MethodOptions {
 			next.ServeHTTP(w, r)
 		}
 	})
@@ -67,6 +68,10 @@ func (m *rbacMiddleware) Wrap(next http.Handler) http.Handler {
 			}
 		}
 
+		if len(validRoles) == 0 {
+			next.ServeHTTP(w, r)
+		}
+
 		info, err := ExtractUserInfoFromContext(r.Context())
 		if err != nil {
 			errorResponse(w, http.StatusUnauthorized, fmt.Errorf("authorization is not valid"))
@@ -85,5 +90,43 @@ func (m *rbacMiddleware) Wrap(next http.Handler) http.Handler {
 func WithRBAC(rbacMap map[string][]entities.User_Role) Middleware {
 	return &rbacMiddleware{
 		rbacMap: rbacMap,
+	}
+}
+
+// authenticateMiddleware represents .
+type authenticateMiddleware struct {
+	tokenGenerator token_utils.Authenticator
+	ignoreRoutes   []string
+}
+
+func (m *authenticateMiddleware) Wrap(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for _, route := range m.ignoreRoutes {
+			method, path, _ := strings.Cut(route, space)
+			// checking path and method is matching with route
+			if isMatchPath(path, r.URL.Path) && method == r.Method {
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		schema, tkn, ok := strings.Cut(r.Header.Get("Authorization"), space)
+		if !ok || strings.ToLower(schema) != "bearer" {
+			errorResponse(w, http.StatusForbidden, fmt.Errorf("authorization is not valid"))
+			return
+		}
+		payload, err := m.tokenGenerator.Verify(tkn)
+		if err != nil {
+			errorResponse(w, http.StatusForbidden, err)
+			return
+		}
+
+		next.ServeHTTP(w, r.WithContext(ImportUserInfoToContext(r.Context(), payload)))
+	})
+}
+func WithAuthenticate(tokenGenerator token_utils.Authenticator, ignoreRoutes []string) Middleware {
+	return &authenticateMiddleware{
+		tokenGenerator: tokenGenerator,
+		ignoreRoutes:   ignoreRoutes,
 	}
 }

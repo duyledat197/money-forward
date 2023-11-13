@@ -64,13 +64,14 @@ func loadHttpServer() {
 		http_server.WithCors(), // using default allow access origin
 		http_server.WithRBAC(map[string][]entities.User_Role{
 			"POST /users":   {entities.SuperAdminRole, entities.AdminRole},
-			"PUT /users":    {entities.SuperAdminRole, entities.AdminRole},
+			"PUT /users":    {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
 			"DELETE /users": {entities.SuperAdminRole, entities.AdminRole},
 
-			"POST /users/{id}/accounts": {entities.SuperAdminRole, entities.AdminRole},
-			"PUT /accounts/{id}":        {entities.SuperAdminRole, entities.AdminRole},
-			"DELETE /accounts/{id}":     {entities.SuperAdminRole, entities.AdminRole},
+			"POST /users/{id}/accounts": {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
+			"PUT /accounts/{id}":        {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
+			"DELETE /accounts/{id}":     {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
 		}),
+		// http_server.WithAuthenticate()
 	)
 }
 

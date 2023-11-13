@@ -6,8 +6,10 @@ import (
 )
 
 const (
-	slash = string(filepath.Separator)
-	space = " "
+	slash        = string(filepath.Separator)
+	space        = " "
+	openBracket  = "{"
+	closeBracket = "}"
 )
 
 var bracketRegex = regexp.MustCompile(`\{(.*?)\}`)
