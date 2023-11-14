@@ -33,7 +33,8 @@ type userService struct {
 	idGenerator id_utils.IDGenerator
 
 	// using memories cache for user entity
-	userCache cache.Cache[int64, *entities.UserWithAccounts]
+	userCache           cache.Cache[int64, *entities.UserWithAccounts]
+	userByUserNameCache cache.Cache[string, *entities.User]
 
 	userRepo interface {
 		Create(ctx context.Context, db database.Executor, data *entities.User) error
@@ -52,12 +53,14 @@ func NewUserService(
 	pgClient *postgres_client.PostgresClient,
 	idGenerator id_utils.IDGenerator,
 	userCache cache.Cache[int64, *entities.UserWithAccounts],
+	userByUserNameCache cache.Cache[string, *entities.User],
 
 ) UserService {
 	return &userService{
-		pgClient:    pgClient,
-		idGenerator: idGenerator,
-		userCache:   userCache,
+		pgClient:            pgClient,
+		idGenerator:         idGenerator,
+		userCache:           userCache,
+		userByUserNameCache: userByUserNameCache,
 
 		// for repositories
 		userRepo:    repositories.NewUserRepository(),
@@ -73,6 +76,10 @@ func (s *userService) CreateUser(ctx context.Context, data *entities.User) (int6
 	}
 
 	data.CreatedBy = userCtx.UserID
+	if existedUser, _ := s.userByUserNameCache.Get(ctx, data.UserName); existedUser != nil {
+		return 0, fmt.Errorf("username already exists")
+	}
+
 	// If user exists we should return an existed user error
 	existedUser, err := s.userRepo.GetUserByUserName(ctx, s.pgClient, data.UserName)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -119,6 +126,10 @@ func (s *userService) GetUserByID(ctx context.Context, id int64) (*entities.User
 
 // Update is representation of business logic to update user by id
 func (s *userService) Update(ctx context.Context, data *entities.User) error {
+	oldUser, err := s.userRepo.GetUserByID(ctx, s.pgClient, data.ID)
+	if err != nil {
+		return err
+	}
 	// just update, no need check exists because we will check row affected.
 	if err := s.userRepo.UpdateByID(ctx, s.pgClient, data.ID, data); err != nil {
 		return err
@@ -126,18 +137,25 @@ func (s *userService) Update(ctx context.Context, data *entities.User) error {
 
 	// remove from cache because user info changed
 	s.userCache.Remove(ctx, data.ID)
+	s.userByUserNameCache.Remove(ctx, oldUser.UserName)
 
 	return nil
 }
 
 // DeleteByID is representation of business logic to update user by id
 func (s *userService) DeleteByID(ctx context.Context, id int64) error {
+	user, err := s.userRepo.GetUserByID(ctx, s.pgClient, id)
+	if err != nil {
+		return err
+	}
+
 	if err := s.userRepo.DeleteByID(ctx, s.pgClient, id); err != nil {
 		return err
 	}
 
 	// remove from cache because user info removed
 	s.userCache.Remove(ctx, id)
+	s.userByUserNameCache.Remove(ctx, user.UserName)
 
 	return nil
 }

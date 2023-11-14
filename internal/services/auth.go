@@ -27,6 +27,8 @@ type authService struct {
 
 	tknGenerator token_utils.Authenticator[*xcontext.UserInfo]
 
+	userByUserNameCache cache.Cache[string, *entities.User]
+
 	userRepo interface {
 		GetUserByUserName(ctx context.Context, db database.Executor, authName string) (*entities.User, error)
 	}
@@ -36,7 +38,7 @@ func NewAuthService(
 	pgClient *postgres_client.PostgresClient,
 	idGenerator id_utils.IDGenerator,
 	tknGenerator token_utils.Authenticator[*xcontext.UserInfo],
-	userByUserNameCache cache.Cache[int64, *entities.User],
+	userByUserNameCache cache.Cache[string, *entities.User],
 
 ) AuthService {
 	return &authService{
@@ -44,14 +46,21 @@ func NewAuthService(
 		idGenerator:  idGenerator,
 		tknGenerator: tknGenerator,
 
+		userByUserNameCache: userByUserNameCache,
+
 		// for repositories
 		userRepo: repositories.NewUserRepository(),
 	}
 }
 func (s *authService) Login(ctx context.Context, req *entities.User) (*entities.User, string, error) {
-	user, err := s.userRepo.GetUserByUserName(ctx, s.pgClient, req.UserName)
-	if err != nil {
-		return nil, "", err
+
+	user, _ := s.userByUserNameCache.Get(ctx, req.UserName)
+	if user == nil {
+		var err error
+		user, err = s.userRepo.GetUserByUserName(ctx, s.pgClient, req.UserName)
+		if err != nil {
+			return nil, "", err
+		}
 	}
 
 	if err := crypto_utils.CheckPassword(req.Password, user.Password); err != nil {

@@ -15,13 +15,13 @@ import (
 	"user-management/internal/services"
 	"user-management/pkg/cache"
 	"user-management/pkg/http_server"
+	"user-management/pkg/http_server/xcontext"
 	"user-management/pkg/id_utils"
 	log "user-management/pkg/logger"
 	"user-management/pkg/lru"
 	"user-management/pkg/postgres_client"
 	"user-management/pkg/processor"
-
-	_ "net/http/pprof"
+	"user-management/pkg/token_utils"
 
 	"github.com/lmittmann/tint"
 )
@@ -32,10 +32,12 @@ var (
 	httpServer     *http_server.HttpServer
 	postgresClient *postgres_client.PostgresClient
 
-	userCache    cache.Cache[int64, *entities.UserWithAccounts]
-	accountCache cache.Cache[int64, *entities.Account]
+	userByUserNameCache cache.Cache[string, *entities.User]
+	userCache           cache.Cache[int64, *entities.UserWithAccounts]
+	accountCache        cache.Cache[int64, *entities.Account]
 
-	idGenerator id_utils.IDGenerator
+	idGenerator    id_utils.IDGenerator
+	tokenGenerator token_utils.Authenticator[*xcontext.UserInfo]
 
 	userService    services.UserService
 	authService    services.AuthService
@@ -58,8 +60,13 @@ func loadLogger() {
 	logger = slog.New(tint.NewHandler(os.Stdout, nil))
 }
 
-func loadIDGenerator() {
+func loadGenerators() {
+	var err error
 	idGenerator = id_utils.NewSnowFlake(rand.Int63n(10))
+	tokenGenerator, err = token_utils.NewPasetoAuthenticator[*xcontext.UserInfo]("asdasd")
+	if err != nil {
+		l.Fatalf("unable to create new token generator: %v", err)
+	}
 }
 
 func loadHttpServer() {
@@ -83,6 +90,7 @@ func loadHttpServer() {
 func loadCaches() {
 	userCache = lru.NewLRU[int64, *entities.UserWithAccounts](128, 24*time.Hour)
 	accountCache = lru.NewLRU[int64, *entities.Account](128, 24*time.Hour)
+	userByUserNameCache = lru.NewLRU[string, *entities.User](128, 24*time.Hour)
 }
 
 func loadPostgresClient() {
@@ -94,11 +102,17 @@ func loadServices() {
 		postgresClient,
 		idGenerator,
 		userCache,
+		userByUserNameCache,
 	)
 
 	accountService = services.NewAccountService(postgresClient, accountCache)
 
-	// authService = services.NewAuthService(postgresClient,idGenerator,)
+	authService = services.NewAuthService(
+		postgresClient,
+		idGenerator,
+		tokenGenerator,
+		userByUserNameCache,
+	)
 }
 
 func registerHandlers() {
@@ -119,7 +133,7 @@ func loadDefault() {
 	// loader
 	loadConfigs()
 	loadLogger()
-	loadIDGenerator()
+	loadGenerators()
 	loadPostgresClient()
 	loadCaches()
 	loadServices()
