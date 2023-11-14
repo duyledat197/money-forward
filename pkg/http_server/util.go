@@ -1,7 +1,9 @@
 package http_server
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"strings"
 )
 
@@ -24,4 +26,20 @@ func isMatchPath(pattern, source string) bool {
 	}
 
 	return isMatch
+}
+
+// appendWildCardParams will get wildcard params in request and append to the request context
+func appendWildCardParams(pattern string, r *http.Request) *http.Request {
+	result := make(map[string]any)
+	patternEls := strings.Split(strings.Trim(pattern, slash), slash)
+	sourceEls := strings.Split(strings.Trim(r.URL.Path, slash), slash)
+	for i, el := range patternEls {
+		if bracketRegex.MatchString(el) {
+			val := strings.TrimLeft(el, openBracket)
+			val = strings.TrimRight(val, closeBracket)
+			result[val] = sourceEls[i]
+		}
+	}
+
+	return r.WithContext(context.WithValue(r.Context(), &wildcardParamsKey{}, result))
 }

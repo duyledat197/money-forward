@@ -8,47 +8,39 @@ import (
 	"github.com/o1egl/paseto"
 )
 
-type PasetoAuthenticator struct {
-	paseto         *paseto.V2
-	symmetricKey   []byte
-	expirationTime time.Duration
+type PasetoAuthenticator[T Claims] struct {
+	paseto       *paseto.V2
+	symmetricKey []byte
 }
 
-func NewPasetoAuthenticator(symmetricKey string, expirationTime time.Duration) (Authenticator, error) {
+func NewPasetoAuthenticator[T Claims](symmetricKey string) (Authenticator[T], error) {
 	if len(symmetricKey) != chacha20poly1305.KeySize {
 		return nil, fmt.Errorf("symmetricKey must have at least 32 bytes")
 	}
-	return &PasetoAuthenticator{
-		paseto:         paseto.NewV2(),
-		symmetricKey:   []byte(symmetricKey),
-		expirationTime: expirationTime,
+	return &PasetoAuthenticator[T]{
+		paseto:       paseto.NewV2(),
+		symmetricKey: []byte(symmetricKey),
 	}, nil
 }
 
-func (a *PasetoAuthenticator) Generate(payload *Payload) (*Token, error) {
-	payload.AddExpired(a.expirationTime)
+func (a *PasetoAuthenticator[T]) Generate(payload T, expirationTime time.Duration) (string, error) {
 	token, err := a.paseto.Encrypt(a.symmetricKey, payload, nil)
-
 	if err != nil {
-		return nil, fmt.Errorf("token is expired")
+		return "", fmt.Errorf("unable to generate token: %w", err)
 	}
 
-	return &Token{
-		Token:     token,
-		ExpiredAt: payload.ExpiredAt,
-		IssueAt:   payload.IssueAt,
-	}, nil
+	return token, nil
 }
 
-func (a *PasetoAuthenticator) Verify(token string) (*Payload, error) {
-	payload := &Payload{}
+func (a *PasetoAuthenticator[T]) Verify(token string) (T, error) {
+	var payload T
 
 	if err := a.paseto.Decrypt(token, a.symmetricKey, payload, nil); err != nil {
-		return nil, fmt.Errorf("token is not valid")
+		return payload, fmt.Errorf("token is not valid: %w", err)
 	}
 
 	if err := payload.Valid(); err != nil {
-		return nil, err
+		return payload, fmt.Errorf("token is not valid: %w", err)
 	}
 
 	return payload, nil

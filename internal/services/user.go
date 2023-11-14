@@ -11,6 +11,7 @@ import (
 	"user-management/pkg/cache"
 	"user-management/pkg/crypto_utils"
 	"user-management/pkg/database"
+	"user-management/pkg/http_server/xcontext"
 	"user-management/pkg/id_utils"
 	"user-management/pkg/postgres_client"
 )
@@ -66,6 +67,12 @@ func NewUserService(
 
 // CreateUser is implementation to business logic for create user.
 func (s *userService) CreateUser(ctx context.Context, data *entities.User) (int64, error) {
+	userCtx, err := xcontext.ExtractUserInfoFromContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	data.CreatedBy = userCtx.UserID
 	// If user exists we should return an existed user error
 	existedUser, err := s.userRepo.GetUserByUserName(ctx, s.pgClient, data.UserName)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {

@@ -1,6 +1,13 @@
 package token_utils
 
-type Authenticator interface {
-	Generate(payload *Payload) (*Token, error)
-	Verify(token string) (*Payload, error)
+import "time"
+
+type Authenticator[T Claims] interface {
+	Generate(payload T, expirationTime time.Duration) (string, error)
+	Verify(token string) (T, error)
+}
+
+type Claims interface {
+	Valid() error
+	AddExpired(time.Duration)
 }

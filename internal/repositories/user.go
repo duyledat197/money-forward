@@ -41,7 +41,7 @@ func (r *UserRepository) GetUserByID(ctx context.Context, db database.Executor, 
 		FROM %[2]s 
 		LEFT JOIN %[3]s ON %[2]s.id = %[3]s.user_id
 		WHERE %[2]s.id = $1
-		GROUP BY %[2]s.id,%[2]s.name
+		GROUP BY %[2]s.id
 	`, strings.Join(fieldNames, ", users."), userE.TableName(), accountE.TableName())
 
 	var result entities.UserWithAccounts

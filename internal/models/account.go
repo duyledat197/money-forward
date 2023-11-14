@@ -1,8 +1,9 @@
 package models
 
 type GetAccountByIDRequest struct {
-	*Account
+	ID int64
 }
 
 type GetAccountByIDResponse struct {
+	*Account
 }

@@ -7,11 +7,12 @@ import (
 )
 
 type User struct {
-	ID       int64          `json:"id" db:"id"`
-	Name     sql.NullString `json:"name" db:"name"`
-	UserName string         `json:"user_name" db:"user_name"`
-	Password string         `json:"password" db:"password"`
-	Role     User_Role      `json:"role" db:"role"`
+	ID        int64          `json:"id" db:"id"`
+	Name      sql.NullString `json:"name" db:"name"`
+	UserName  string         `json:"user_name" db:"user_name"`
+	Password  string         `json:"password" db:"password"`
+	Role      User_Role      `json:"role" db:"role"`
+	CreatedBy int64          `json:"created_by"`
 }
 
 func (u *User) TableName() string {

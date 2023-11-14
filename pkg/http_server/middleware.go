@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"user-management/internal/entities"
+	"user-management/pkg/http_server/xcontext"
 	"user-management/pkg/token_utils"
 )
 
@@ -70,9 +71,10 @@ func (m *rbacMiddleware) Wrap(next http.Handler) http.Handler {
 
 		if len(validRoles) == 0 {
 			next.ServeHTTP(w, r)
+			return
 		}
 
-		info, err := ExtractUserInfoFromContext(r.Context())
+		info, err := xcontext.ExtractUserInfoFromContext(r.Context())
 		if err != nil {
 			errorResponse(w, http.StatusUnauthorized, fmt.Errorf("authorization is not valid"))
 			return
@@ -95,7 +97,7 @@ func WithRBAC(rbacMap map[string][]entities.User_Role) Middleware {
 
 // authenticateMiddleware represents .
 type authenticateMiddleware struct {
-	tokenGenerator token_utils.Authenticator
+	tokenGenerator token_utils.Authenticator[*xcontext.UserInfo]
 	ignoreRoutes   []string
 }
 
@@ -121,10 +123,10 @@ func (m *authenticateMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		next.ServeHTTP(w, r.WithContext(ImportUserInfoToContext(r.Context(), payload)))
+		next.ServeHTTP(w, r.WithContext(xcontext.ImportUserInfoToContext(r.Context(), payload)))
 	})
 }
-func WithAuthenticate(tokenGenerator token_utils.Authenticator, ignoreRoutes []string) Middleware {
+func WithAuthenticate(tokenGenerator token_utils.Authenticator[*xcontext.UserInfo], ignoreRoutes []string) Middleware {
 	return &authenticateMiddleware{
 		tokenGenerator: tokenGenerator,
 		ignoreRoutes:   ignoreRoutes,

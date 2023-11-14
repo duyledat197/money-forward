@@ -27,8 +27,8 @@ func errorResponse(w http.ResponseWriter, code int, err error) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	log.Println("code", code)
 	w.WriteHeader(code)
-	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(jData); err != nil {
 		log.Println(err)
 	}

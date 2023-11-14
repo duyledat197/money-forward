@@ -49,6 +49,6 @@ func (d *authDelivery) Login(ctx context.Context, req *models.LoginRequest) (*mo
 		Name:  user.Name.String,
 		Role:  string(user.Role),
 		ID:    user.ID,
-		Token: token.Token,
+		Token: token,
 	}, nil
 }

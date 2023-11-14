@@ -21,6 +21,8 @@ import (
 	"user-management/pkg/postgres_client"
 	"user-management/pkg/processor"
 
+	_ "net/http/pprof"
+
 	"github.com/lmittmann/tint"
 )
 
@@ -30,11 +32,14 @@ var (
 	httpServer     *http_server.HttpServer
 	postgresClient *postgres_client.PostgresClient
 
-	userCache cache.Cache[int64, *entities.UserWithAccounts]
+	userCache    cache.Cache[int64, *entities.UserWithAccounts]
+	accountCache cache.Cache[int64, *entities.Account]
 
 	idGenerator id_utils.IDGenerator
 
-	userService services.UserService
+	userService    services.UserService
+	authService    services.AuthService
+	accountService services.AccountService
 
 	processors []processor.Processor
 	factories  []processor.Factory
@@ -62,21 +67,22 @@ func loadHttpServer() {
 		cfgs.HTTP,
 		logger,
 		http_server.WithCors(), // using default allow access origin
-		http_server.WithRBAC(map[string][]entities.User_Role{
-			"POST /users":   {entities.SuperAdminRole, entities.AdminRole},
-			"PUT /users":    {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
-			"DELETE /users": {entities.SuperAdminRole, entities.AdminRole},
+		// http_server.WithRBAC(map[string][]entities.User_Role{
+		// 	"POST /users":   {entities.SuperAdminRole, entities.AdminRole},
+		// 	"PUT /users":    {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
+		// 	"DELETE /users": {entities.SuperAdminRole, entities.AdminRole},
 
-			"POST /users/{id}/accounts": {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
-			"PUT /accounts/{id}":        {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
-			"DELETE /accounts/{id}":     {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
-		}),
+		// 	"POST /users/{id}/accounts": {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
+		// 	"PUT /accounts/{id}":        {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
+		// 	"DELETE /accounts/{id}":     {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
+		// }),
 		// http_server.WithAuthenticate()
 	)
 }
 
 func loadCaches() {
 	userCache = lru.NewLRU[int64, *entities.UserWithAccounts](128, 24*time.Hour)
+	accountCache = lru.NewLRU[int64, *entities.Account](128, 24*time.Hour)
 }
 
 func loadPostgresClient() {
@@ -89,10 +95,16 @@ func loadServices() {
 		idGenerator,
 		userCache,
 	)
+
+	accountService = services.NewAccountService(postgresClient, accountCache)
+
+	// authService = services.NewAuthService(postgresClient,idGenerator,)
 }
 
 func registerHandlers() {
 	deliveries.RegisterUserDelivery(httpServer, userService)
+	deliveries.RegisterAuthDelivery(httpServer, authService)
+	deliveries.RegisterAccountDelivery(httpServer, accountService)
 }
 
 func registerFactories() {
