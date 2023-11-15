@@ -5,7 +5,6 @@ go 1.21.4
 require (
 	github.com/aead/chacha20poly1305 v0.0.0-20201124145622-1a5aba2a8b29
 	github.com/bwmarrin/snowflake v0.3.0
-	github.com/bxcodec/faker/v3 v3.8.1
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/lib/pq v1.10.9
 	github.com/lmittmann/tint v1.0.3

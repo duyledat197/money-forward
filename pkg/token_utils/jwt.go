@@ -8,6 +8,7 @@ import (
 	"github.com/reddit/jwt-go"
 )
 
+// JWTAuthenticator is representation of [Authenticator] engine that implement using JWT.
 type JWTAuthenticator[T Claims] struct {
 	secretKey string
 }

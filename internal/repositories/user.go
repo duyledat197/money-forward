@@ -29,6 +29,21 @@ func (r *UserRepository) Create(ctx context.Context, db database.Executor, data 
 	return nil
 }
 
+// Create is an implementation of inserting a user entity
+func (r *UserRepository) Upsert(ctx context.Context, db database.Executor, data *entities.User) error {
+	fieldNames, values := database.FieldMap(data)
+	placeHolder := database.GetPlaceholders(len(fieldNames))
+	stmt := fmt.Sprintf(`
+		INSERT INTO %s(%s) VALUES(%s)
+		ON CONFLICT ON CONSTRAINT users_user_name_key DO NOTHING
+	`, data.TableName(), strings.Join(fieldNames, ", "), placeHolder)
+	if _, err := db.ExecContext(ctx, stmt, values...); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // GetUserByID is an implementation of retrieving user by id from database.
 func (r *UserRepository) GetUserByID(ctx context.Context, db database.Executor, id int64) (*entities.UserWithAccounts, error) {
 	userE := entities.User{}

@@ -16,5 +16,4 @@ var bracketRegex = regexp.MustCompile(`\{(.*?)\}`)
 
 type (
 	wildcardParamsKey struct{}
-	userInfoKey       struct{}
 )

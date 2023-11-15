@@ -2,11 +2,13 @@ package http_server
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"slices"
 	"strings"
 	"user-management/internal/entities"
 	"user-management/pkg/http_server/xcontext"
+	"user-management/pkg/logger"
 	"user-management/pkg/token_utils"
 )
 
@@ -52,6 +54,7 @@ func WithCors(methods ...string) Middleware {
 	}
 }
 
+// corsMiddleware represents option that implements rbac for authorized.
 type rbacMiddleware struct {
 	rbacMap map[string][]entities.User_Role
 }
@@ -76,12 +79,12 @@ func (m *rbacMiddleware) Wrap(next http.Handler) http.Handler {
 
 		info, err := xcontext.ExtractUserInfoFromContext(r.Context())
 		if err != nil {
-			errorResponse(w, http.StatusUnauthorized, fmt.Errorf("authorization is not valid"))
+			errorResponse(w, http.StatusUnauthorized, fmt.Errorf("authorization is not valid: user info not valid"))
 			return
 		}
 
 		if !slices.Contains(validRoles, entities.User_Role(info.Role)) {
-			errorResponse(w, http.StatusForbidden, fmt.Errorf("authorization is not valid"))
+			errorResponse(w, http.StatusForbidden, fmt.Errorf("authorization is not valid: role is not valid"))
 			return
 		}
 
@@ -95,7 +98,7 @@ func WithRBAC(rbacMap map[string][]entities.User_Role) Middleware {
 	}
 }
 
-// authenticateMiddleware represents .
+// authenticateMiddleware represents options that implements authenticate for a request.
 type authenticateMiddleware struct {
 	tokenGenerator token_utils.Authenticator[*xcontext.UserInfo]
 	ignoreRoutes   []string
@@ -114,7 +117,7 @@ func (m *authenticateMiddleware) Wrap(next http.Handler) http.Handler {
 
 		schema, tkn, ok := strings.Cut(r.Header.Get("Authorization"), space)
 		if !ok || strings.ToLower(schema) != "bearer" {
-			errorResponse(w, http.StatusForbidden, fmt.Errorf("authorization is not valid"))
+			errorResponse(w, http.StatusForbidden, fmt.Errorf("authorization is not valid: schema must be bearer"))
 			return
 		}
 		payload, err := m.tokenGenerator.Verify(tkn)
@@ -123,12 +126,42 @@ func (m *authenticateMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
+		log.Println(*payload)
+
 		next.ServeHTTP(w, r.WithContext(xcontext.ImportUserInfoToContext(r.Context(), payload)))
 	})
 }
+
 func WithAuthenticate(tokenGenerator token_utils.Authenticator[*xcontext.UserInfo], ignoreRoutes []string) Middleware {
 	return &authenticateMiddleware{
 		tokenGenerator: tokenGenerator,
 		ignoreRoutes:   ignoreRoutes,
+	}
+}
+
+// recoveryMiddleware represents options that implements recovery a panic occurs in handle flow for a request.
+type recoveryMiddleware struct {
+	logger logger.Logger
+}
+
+func (m *recoveryMiddleware) Wrap(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			err := recover()
+			if err != nil {
+
+				m.logger.Error("http handle was got an error", "err", err) // May be log this error? Send to sentry?
+				errorResponse(w, http.StatusInternalServerError, fmt.Errorf("there was an internal server error"))
+			}
+
+		}()
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func WithRecovery(logger logger.Logger) Middleware {
+	return &recoveryMiddleware{
+		logger: logger,
 	}
 }

@@ -24,6 +24,8 @@ func ConvertMapToStruct[T any](m map[string]any, s *T) error {
 				}
 				stValue.Field(i).Set(reflect.ValueOf(iVal))
 				// TODO: convert other concrete types.
+			case reflect.TypeOf(value).Kind() == reflect.Float64 && field.Type.Kind() == reflect.Int64:
+				stValue.Field(i).Set(reflect.ValueOf(int64(value.(float64))))
 			default:
 				stValue.Field(i).Set(reflect.ValueOf(value))
 			}

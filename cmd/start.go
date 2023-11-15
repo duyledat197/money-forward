@@ -22,6 +22,7 @@ to quickly create a Cobra application.`,
 		loadDefault()
 		errChan := make(chan error)
 		start(ctx, errChan)
+		migrateAdmin(ctx)
 		err := <-errChan
 		if err != nil {
 			logger.Error(err.Error())

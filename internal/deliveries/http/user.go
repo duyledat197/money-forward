@@ -131,8 +131,9 @@ func (d *userDelivery) CreateAccountByUserID(ctx context.Context, req *models.Cr
 	}
 
 	id, err := d.userService.CreateAccount(ctx, &entities.Account{
-		Name:   database.NullString(req.Name),
-		UserID: req.UserID,
+		Name:    database.NullString(req.Name),
+		UserID:  req.UserID,
+		Balance: database.NullInt64(req.Balance),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to update user by id: %w", err)

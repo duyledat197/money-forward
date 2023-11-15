@@ -2,6 +2,9 @@ package services
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"fmt"
 	"time"
 
 	"user-management/internal/entities"
@@ -59,6 +62,9 @@ func (s *authService) Login(ctx context.Context, req *entities.User) (*entities.
 		var err error
 		user, err = s.userRepo.GetUserByUserName(ctx, s.pgClient, req.UserName)
 		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, "", fmt.Errorf("username or password is not correctly")
+			}
 			return nil, "", err
 		}
 	}

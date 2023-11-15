@@ -9,6 +9,10 @@ import (
 type Config struct {
 	PostgresDB *Database
 	HTTP       *Endpoint
+
+	SymetricKey        string
+	SuperAdminUsername string
+	SuperAdminPassword string
 }
 
 type config struct {
@@ -20,6 +24,11 @@ type config struct {
 
 	HttpHost string `mapstructure:"HTTP_HOST"`
 	HttpPort string `mapstructure:"HTTP_PORT"`
+
+	SymetricKey string `mapstructure:"SYMETRIC_KEY"`
+
+	SuperAdminUsername string `mapstructure:"SUPER_ADMIN_USERNAME"`
+	SuperAdminPassword string `mapstructure:"SUPER_ADMIN_PASSWORD"`
 }
 
 func LoadConfig(path string, env string) (*Config, error) {
@@ -50,5 +59,8 @@ func LoadConfig(path string, env string) (*Config, error) {
 			Host: cfg.HttpHost,
 			Port: cfg.HttpPort,
 		},
+		SymetricKey:        cfg.SymetricKey,
+		SuperAdminUsername: cfg.SuperAdminUsername,
+		SuperAdminPassword: cfg.SuperAdminPassword,
 	}, nil
 }

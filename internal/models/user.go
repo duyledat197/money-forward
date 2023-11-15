@@ -30,7 +30,7 @@ type UpdateUserResponse struct {
 type CreateAccountByUserIDRequest struct {
 	UserID  int64  `json:"user_id"`
 	Name    string `json:"name"`
-	Balance int    `json:"balance"`
+	Balance int64  `json:"balance"`
 }
 type CreateAccountByUserIDResponse struct {
 	ID int64 `json:"id"`

@@ -12,8 +12,11 @@ import (
 	"user-management/configs"
 	deliveries "user-management/internal/deliveries/http"
 	"user-management/internal/entities"
+	"user-management/internal/repositories"
 	"user-management/internal/services"
 	"user-management/pkg/cache"
+	"user-management/pkg/crypto_utils"
+	"user-management/pkg/database"
 	"user-management/pkg/http_server"
 	"user-management/pkg/http_server/xcontext"
 	"user-management/pkg/id_utils"
@@ -63,7 +66,7 @@ func loadLogger() {
 func loadGenerators() {
 	var err error
 	idGenerator = id_utils.NewSnowFlake(rand.Int63n(10))
-	tokenGenerator, err = token_utils.NewPasetoAuthenticator[*xcontext.UserInfo]("asdasd")
+	tokenGenerator, err = token_utils.NewPasetoAuthenticator[*xcontext.UserInfo](cfgs.SymetricKey)
 	if err != nil {
 		l.Fatalf("unable to create new token generator: %v", err)
 	}
@@ -73,17 +76,24 @@ func loadHttpServer() {
 	httpServer = http_server.NewHttpServer(
 		cfgs.HTTP,
 		logger,
-		http_server.WithCors(), // using default allow access origin
-		// http_server.WithRBAC(map[string][]entities.User_Role{
-		// 	"POST /users":   {entities.SuperAdminRole, entities.AdminRole},
-		// 	"PUT /users":    {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
-		// 	"DELETE /users": {entities.SuperAdminRole, entities.AdminRole},
 
-		// 	"POST /users/{id}/accounts": {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
-		// 	"PUT /accounts/{id}":        {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
-		// 	"DELETE /accounts/{id}":     {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
-		// }),
-		// http_server.WithAuthenticate()
+		// middlewares will be handle by passing order.
+		http_server.WithCors(), // using default allow access origin
+		http_server.WithAuthenticate(tokenGenerator, []string{
+			"POST /auth/login",
+			"GET /users/{id}",
+			"GET /users/{id}/accounts",
+		}),
+		http_server.WithRBAC(map[string][]entities.User_Role{
+			"POST /users":   {entities.SuperAdminRole, entities.AdminRole},
+			"PUT /users":    {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
+			"DELETE /users": {entities.SuperAdminRole, entities.AdminRole},
+
+			"POST /users/{id}/accounts": {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
+			"PUT /accounts/{id}":        {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
+			"DELETE /accounts/{id}":     {entities.SuperAdminRole, entities.AdminRole, entities.UserRole},
+		}),
+		http_server.WithRecovery(logger),
 	)
 }
 
@@ -127,6 +137,22 @@ func registerFactories() {
 
 func registerProcessors() {
 	processors = append(processors, httpServer)
+}
+
+func migrateAdmin(ctx context.Context) {
+	id := idGenerator.Int64()
+	pwd, _ := crypto_utils.HashPassword(cfgs.SuperAdminPassword)
+	userRepo := repositories.NewUserRepository()
+	if err := userRepo.Upsert(ctx, postgresClient, &entities.User{
+		ID:        id,
+		Name:      database.NullString("admin"),
+		UserName:  cfgs.SuperAdminUsername,
+		Password:  pwd,
+		Role:      entities.SuperAdminRole,
+		CreatedBy: id,
+	}); err != nil {
+		l.Fatalf("unable to migrate super admin : %v", err)
+	}
 }
 
 func loadDefault() {

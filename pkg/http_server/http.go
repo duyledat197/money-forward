@@ -9,6 +9,7 @@ import (
 	"log"
 	"maps"
 	"net/http"
+	"slices"
 	"strings"
 
 	"user-management/configs"
@@ -62,6 +63,7 @@ func (s *HttpServer) Start(ctx context.Context) error {
 	})
 
 	var handler http.Handler = mux
+	slices.Reverse(s.middlewares)
 
 	// Merge all middleware handlers into one that can using for register to http server.
 	for _, middleware := range s.middlewares {

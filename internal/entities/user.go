@@ -12,7 +12,7 @@ type User struct {
 	UserName  string         `json:"user_name" db:"user_name"`
 	Password  string         `json:"password" db:"password"`
 	Role      User_Role      `json:"role" db:"role"`
-	CreatedBy int64          `json:"created_by"`
+	CreatedBy int64          `json:"created_by" db:"created_by"`
 }
 
 func (u *User) TableName() string {
